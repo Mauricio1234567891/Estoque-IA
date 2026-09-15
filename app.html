@@ -1,71 +1,72 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#07111f"><title>Estoque IA — App</title>
+<meta name="theme-color" content="#07111f"><title>Estoque IA V13.1.1 — App</title>
 <style>
 :root{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef6ff;background:#07111f;--panel:#101e31;--line:#263d59;--muted:#94a8c0;--green:#20c997}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#123453 0,transparent 34%),#07111f}.wrap{max-width:1180px;margin:auto;padding:24px}.auth{max-width:520px;margin:5vh auto}.brand{font-weight:900;font-size:27px}.brand b{color:var(--green)}.card{background:rgba(16,30,49,.96);border:1px solid var(--line);border-radius:20px;padding:24px;margin-top:18px;box-shadow:0 22px 60px rgba(0,0,0,.18)}h1,h2{letter-spacing:-.7px}.muted{color:var(--muted)}.eyebrow{display:inline-block;color:#76e4c6;background:#10352f;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}.form{display:grid;gap:12px}.form.twoform{grid-template-columns:1fr 1fr}.field label{display:block;color:#b7c8da;font-size:13px;margin:0 0 6px}.field input,.field select,input,select,button{width:100%;border-radius:11px;border:1px solid #2a4261;padding:12px;background:#0b1728;color:#fff;font-size:15px}.field input:focus,input:focus{outline:2px solid #1d9f7c;outline-offset:1px}button{cursor:pointer;background:#18b889;border:0;font-weight:850}.secondary{background:#243750}.linkbtn{background:transparent;color:#9edfcf;border:0;padding:7px;width:auto}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{width:auto}.wide{width:100%!important}.notice{background:#0d2c28;border:1px solid #205347;color:#bfeee2;padding:11px;border-radius:11px;font-size:13px}.error{color:#ffb7b7;margin:10px 0 0}.top{display:flex;gap:12px;align-items:center;justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.kpi strong{display:block;font-size:28px;margin-top:8px}.two{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.products{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.prod{text-align:left;background:#15243a}.cartline{display:flex;justify-content:space-between;border-bottom:1px solid #243750;padding:10px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #243750;text-align:left}.hidden{display:none}.status{padding:7px 10px;border-radius:999px;background:#163e34}.back{color:#9fb2c8;font-size:14px}.planbox{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#0b1728;border:1px solid #294561;padding:12px;border-radius:12px}.planbox strong{color:#77e5c6}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#123453 0,transparent 34%),#07111f}.wrap{max-width:1180px;margin:auto;padding:24px}.auth{max-width:520px;margin:5vh auto}.brand{font-weight:900;font-size:27px}.brand b{color:var(--green)}.card{background:rgba(16,30,49,.96);border:1px solid var(--line);border-radius:20px;padding:24px;margin-top:18px;box-shadow:0 22px 60px rgba(0,0,0,.18)}h1,h2{letter-spacing:-.7px}.muted{color:var(--muted)}.eyebrow{display:inline-block;color:#76e4c6;background:#10352f;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}.form{display:grid;gap:12px}.form.twoform{grid-template-columns:1fr 1fr}.field label{display:block;color:#b7c8da;font-size:13px;margin:0 0 6px}.field input,.field select,input,select,button{width:100%;border-radius:11px;border:1px solid #2a4261;padding:12px;background:#0b1728;color:#fff;font-size:15px}button{cursor:pointer;background:#18b889;border:0;font-weight:850}.secondary{background:#243750}.linkbtn{background:transparent;color:#9edfcf;border:0;padding:7px;width:auto}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{width:auto}.wide{width:100%!important}.notice{background:#0d2c28;border:1px solid #205347;color:#bfeee2;padding:11px;border-radius:11px;font-size:13px}.error{color:#ffb7b7;margin:10px 0 0}.ok{color:#8ff0d3}.top{display:flex;gap:12px;align-items:center;justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.kpi strong{display:block;font-size:28px;margin-top:8px}.two{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.products{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.prod{text-align:left;background:#15243a}.cartline{display:flex;justify-content:space-between;border-bottom:1px solid #243750;padding:10px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #243750;text-align:left}.hidden{display:none}.status{padding:7px 10px;border-radius:999px;background:#163e34}.back{color:#9fb2c8;font-size:14px}.planbox{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#0b1728;border:1px solid #294561;padding:12px;border-radius:12px}.planbox strong{color:#77e5c6}
 @media(max-width:800px){.grid,.two,.products,.form.twoform{grid-template-columns:1fr}.wrap{padding:14px}.auth{margin:3vh auto}.card{padding:20px}.top{align-items:flex-start}.row button{flex:1}}
 </style></head><body>
-
 <div id="auth" class="wrap auth">
-  <a class="back" href="index.html">← Voltar ao site</a>
-  <div class="brand" style="margin-top:22px">Estoque <b>IA</b></div>
-
-  <div id="loginBox" class="card">
-    <span class="eyebrow">ACESSO DO CLIENTE</span>
-    <h1>Entrar no Estoque IA</h1>
-    <p class="muted">Acesse sua empresa, produtos, estoque, PDV e indicadores.</p>
-    <div class="form">
-      <div class="field"><label>E-mail</label><input id="email" type="email" autocomplete="email" placeholder="voce@empresa.com"></div>
-      <div class="field"><label>Senha</label><input id="pass" type="password" autocomplete="current-password" placeholder="Sua senha"></div>
-      <button class="wide" onclick="login()">Entrar</button>
-    </div>
-    <p id="msg" class="error"></p>
-    <p class="muted" style="text-align:center">Ainda não tem conta? <button class="linkbtn" onclick="showSignup()">Começar teste grátis</button></p>
-  </div>
-
-  <div id="signupBox" class="card hidden">
-    <span class="eyebrow">14 DIAS DE TESTE</span>
-    <h1>Crie sua empresa</h1>
-    <p class="muted">Configure seu acesso e entre automaticamente no Estoque IA.</p>
-    <div class="planbox"><div><small class="muted">Plano selecionado</small><br><strong id="planLabel">PRO</strong></div>
-      <select id="regPlan" style="width:auto" onchange="updatePlan()"><option value="BASICO">Básico</option><option value="PRO">PRO</option><option value="PREMIUM">Premium</option></select></div>
-    <div class="form twoform" style="margin-top:14px">
-      <div class="field"><label>Empresa</label><input id="regCompany" placeholder="Nome da empresa"></div>
-      <div class="field"><label>Responsável</label><input id="regName" autocomplete="name" placeholder="Seu nome"></div>
-      <div class="field"><label>E-mail</label><input id="regEmail" type="email" autocomplete="email" placeholder="voce@empresa.com"></div>
-      <div class="field"><label>Senha</label><input id="regPass" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>
-    </div>
-    <div class="notice" style="margin-top:14px">Ao criar a conta, sua empresa será registrada no backend e você será conectado automaticamente.</div>
-    <button class="wide" style="margin-top:14px" onclick="register()">Criar empresa e acessar →</button>
-    <p id="regMsg" class="error"></p>
-    <p class="muted" style="text-align:center">Já possui conta? <button class="linkbtn" onclick="showLogin()">Entrar</button></p>
-  </div>
-</div>
+<a class="back" href="index.html">← Voltar ao site</a><div class="brand" style="margin-top:22px">Estoque <b>IA</b></div>
+<div id="loginBox" class="card"><span class="eyebrow">ACESSO DO CLIENTE</span><h1>Entrar no Estoque IA</h1><p class="muted">Acesse sua empresa, produtos, estoque, PDV e indicadores.</p>
+<div class="form"><div class="field"><label>E-mail</label><input id="email" type="email" autocomplete="email" placeholder="voce@empresa.com"></div><div class="field"><label>Senha</label><input id="pass" type="password" autocomplete="current-password" placeholder="Sua senha"></div><button onclick="login()">Entrar</button></div><p id="msg" class="error"></p><p class="muted" style="text-align:center">Ainda não tem conta? <button class="linkbtn" onclick="showSignup()">Começar teste grátis</button></p></div>
+<div id="signupBox" class="card hidden"><span class="eyebrow">14 DIAS DE TESTE • V13.1.1</span><h1>Crie sua empresa</h1><p class="muted">Configure seu acesso e entre automaticamente no Estoque IA.</p>
+<div class="planbox"><div><small class="muted">Plano selecionado</small><br><strong id="planLabel">PRO</strong></div><select id="regPlan" style="width:auto" onchange="updatePlan()"><option value="BASICO">Básico</option><option value="PRO">PRO</option><option value="PREMIUM">Premium</option></select></div>
+<div class="form twoform" style="margin-top:14px"><div class="field"><label>Empresa</label><input id="regCompany" placeholder="Nome da empresa"></div><div class="field"><label>Responsável</label><input id="regName" placeholder="Seu nome"></div><div class="field"><label>E-mail</label><input id="regEmail" type="email" placeholder="voce@empresa.com"></div><div class="field"><label>Senha</label><input id="regPass" type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div></div>
+<div class="notice" style="margin-top:14px">A senha deve ter pelo menos 8 caracteres. Ao criar a conta, a empresa será registrada e o acesso será iniciado automaticamente.</div><button id="registerBtn" class="wide" style="margin-top:14px" onclick="register()">Criar empresa e acessar →</button><p id="regMsg" class="error"></p><p class="muted" style="text-align:center">Já possui conta? <button class="linkbtn" onclick="showLogin()">Entrar</button></p></div></div>
 
 <div id="app" class="wrap hidden"><div class="top"><div class="brand">Estoque <b>IA</b></div><div><span id="who" class="status"></span> <button class="secondary" style="width:auto" onclick="logout()">Sair</button></div></div>
 <div class="grid"><div class="card kpi"><span class="muted">Faturamento mês</span><strong id="rev">R$ 0</strong></div><div class="card kpi"><span class="muted">Vendas</span><strong id="sales">0</strong></div><div class="card kpi"><span class="muted">Ticket médio</span><strong id="ticket">R$ 0</strong></div><div class="card kpi"><span class="muted">Estoque crítico</span><strong id="low">0</strong></div></div>
-<div class="two"><div><div class="card"><h2>PDV conectado</h2><div class="row"><input id="search" placeholder="Buscar SKU, EAN ou produto" oninput="renderProducts()"><select id="branch" style="width:auto"></select></div><div id="products" class="products" style="margin-top:14px"></div></div><div class="card"><h2>Novo produto</h2><div class="form twoform"><input id="sku" placeholder="SKU"><input id="barcode" placeholder="EAN"><input id="name" placeholder="Produto"><input id="price" type="number" step=".01" placeholder="Preço"><input id="cost" type="number" step=".01" placeholder="Custo"><input id="stock" type="number" step=".001" placeholder="Estoque"><input id="min" type="number" step=".001" placeholder="Mínimo"><button onclick="addProduct()">Cadastrar produto</button></div></div></div>
+<div class="two"><div><div class="card"><h2>PDV conectado</h2><div class="row"><input id="search" placeholder="Buscar SKU, EAN ou produto" oninput="renderProducts()"><select id="branch" style="width:auto"></select></div><div id="products" class="products" style="margin-top:14px"></div></div>
+<div class="card"><h2>Novo produto</h2><div class="form twoform"><input id="sku" placeholder="SKU"><input id="barcode" placeholder="EAN"><input id="name" placeholder="Produto"><input id="price" type="number" step=".01" placeholder="Preço"><input id="cost" type="number" step=".01" placeholder="Custo"><input id="stock" type="number" step=".001" placeholder="Estoque"><input id="min" type="number" step=".001" placeholder="Mínimo"><button onclick="addProduct()">Cadastrar produto</button></div></div></div>
 <div><div class="card"><h2>Carrinho</h2><div id="cart"></div><h2 id="total">R$ 0</h2><select id="pay"><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select><button style="margin-top:10px" onclick="checkout()">Finalizar venda</button><p id="saleMsg" class="muted"></p></div><div class="card"><h2>Últimas vendas</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Operador</th><th>Pagamento</th><th>Total</th></tr></thead><tbody id="history"></tbody></table></div></div></div></div></div>
 
 <script>
+const $=id=>document.getElementById(id);
 let token=localStorage.getItem('v12_token')||'',refreshToken=localStorage.getItem('v12_refresh')||'',products=[],cart=[];
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const base=()=>''; // V13.1 usa sempre o mesmo servidor; nenhum campo técnico é exposto ao cliente.
-async function call(path,opt={}){let r=await fetch(base()+path,{...opt,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opt.headers||{})}});let j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||j.message||'Não foi possível concluir a operação');return j}
-function saveSession(x){token=x.access_token;refreshToken=x.refresh_token||'';localStorage.setItem('v12_token',token);localStorage.setItem('v12_refresh',refreshToken)}
-function showLogin(){loginBox.classList.remove('hidden');signupBox.classList.add('hidden');history.replaceState(null,'','app.html?mode=login')}
-function showSignup(){loginBox.classList.add('hidden');signupBox.classList.remove('hidden')}
-function updatePlan(){planLabel.textContent=regPlan.options[regPlan.selectedIndex].text}
-async function login(){msg.textContent='';if(!email.value||!pass.value){msg.textContent='Informe e-mail e senha.';return}try{let x=await call('/auth/login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value})});saveSession(x);await boot()}catch(e){msg.textContent='Não foi possível entrar: '+e.message}}
-async function register(){regMsg.textContent='';let company=regCompany.value.trim(),name=regName.value.trim(),em=regEmail.value.trim(),pw=regPass.value,plan=regPlan.value;if(!company||!name||!em||!pw){regMsg.textContent='Preencha todos os campos.';return}if(!/^\S+@\S+\.\S+$/.test(em)){regMsg.textContent='Informe um e-mail válido.';return}if(pw.length<6){regMsg.textContent='A senha precisa ter pelo menos 6 caracteres.';return}try{let x=await call('/auth/register',{method:'POST',body:JSON.stringify({company,name,email:em,password:pw,plan})});saveSession(x);localStorage.setItem('v131_selected_plan',plan);await boot()}catch(e){regMsg.textContent='Cadastro não concluído: '+e.message}}
-async function boot(){try{let [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);auth.classList.add('hidden');app.classList.remove('hidden');who.textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;branch.innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;rev.textContent=br(d.revenue);sales.textContent=d.sales;ticket.textContent=br(d.ticket);low.textContent=d.low_stock;history.innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');renderProducts();renderCart()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';auth.classList.remove('hidden');app.classList.add('hidden')}}
-function renderProducts(){let q=(search.value||'').toLowerCase();productsEl=document.getElementById('products');productsEl.innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q)).map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>'}
-function addCart(id){let p=products.find(x=>x.id===id),x=cart.find(x=>x.id===id);let q=x?x.qty:0;if(q>=Number(p.stock))return alert('Estoque insuficiente');if(x)x.qty++;else cart.push({id,qty:1});renderCart()}
-function renderCart(){document.getElementById('cart').innerHTML=cart.map(x=>{let p=products.find(y=>y.id===x.id);return `<div class="cartline"><span>${p.name} × ${x.qty}</span><span>${br(Number(p.price)*x.qty)} <button class="secondary" style="width:auto" onclick="del('${x.id}')">×</button></span></div>`}).join('')||'<p class="muted">Carrinho vazio.</p>';total.textContent=br(cart.reduce((a,x)=>a+Number(products.find(p=>p.id===x.id).price)*x.qty,0))}
+function readableError(j,status){
+ if(typeof j?.error==='string'){
+   const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.'};
+   return map[j.error]||j.error;
+ }
+ if(j?.error?.fieldErrors){const p=[];for(const [f,m] of Object.entries(j.error.fieldErrors)){if(m?.length)p.push((f==='password'?'senha':f)+': '+m.join(', '))}if(p.length)return p.join(' | ')}
+ if(j?.error?.formErrors?.length)return j.error.formErrors.join(', ');
+ if(typeof j?.message==='string')return j.message;
+ return 'Erro '+status+'. Não foi possível concluir a operação.';
+}
+async function call(path,opt={}){
+ const r=await fetch(path,{...opt,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opt.headers||{})}});
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok)throw new Error(readableError(j,r.status));
+ return j;
+}
+function saveSession(x){if(!x?.access_token)throw new Error('O servidor não retornou uma sessão válida.');token=x.access_token;refreshToken=x.refresh_token||'';localStorage.setItem('v12_token',token);localStorage.setItem('v12_refresh',refreshToken)}
+function showLogin(){$('loginBox').classList.remove('hidden');$('signupBox').classList.add('hidden');history.replaceState(null,'','app.html?mode=login')}
+function showSignup(){$('loginBox').classList.add('hidden');$('signupBox').classList.remove('hidden')}
+function updatePlan(){$('planLabel').textContent=$('regPlan').options[$('regPlan').selectedIndex].text}
+async function login(){$('msg').textContent='';if(!$('email').value||!$('pass').value){$('msg').textContent='Informe e-mail e senha.';return}try{const x=await call('/auth/login',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),password:$('pass').value})});saveSession(x);await boot()}catch(e){$('msg').textContent='Não foi possível entrar: '+e.message}}
+async function register(){
+ const m=$('regMsg'),btn=$('registerBtn');m.textContent='';
+ const company=$('regCompany').value.trim(),name=$('regName').value.trim(),email=$('regEmail').value.trim().toLowerCase(),password=$('regPass').value,plan=$('regPlan').value;
+ if(!company||!name||!email||!password){m.textContent='Preencha todos os campos.';return}
+ if(company.length<2||name.length<2){m.textContent='Empresa e responsável devem ter pelo menos 2 caracteres.';return}
+ if(!/^\S+@\S+\.\S+$/.test(email)){m.textContent='Informe um e-mail válido.';return}
+ if(password.length<8){m.textContent='A senha precisa ter pelo menos 8 caracteres.';return}
+ btn.disabled=true;btn.textContent='Criando empresa...';
+ try{
+   const x=await call('/auth/register',{method:'POST',body:JSON.stringify({company,name,email,password,plan})});
+   saveSession(x);localStorage.setItem('v131_selected_plan',plan);m.className='ok';m.textContent='Empresa criada. Entrando...';await boot();
+ }catch(e){m.className='error';m.textContent='Cadastro não concluído: '+e.message}
+ finally{btn.disabled=false;btn.textContent='Criar empresa e acessar →'}
+}
+async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');renderProducts();renderCart()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
+function renderProducts(){const q=($('search').value||'').toLowerCase();$('products').innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q)).map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>'}
+function addCart(id){const p=products.find(x=>x.id===id),x=cart.find(x=>x.id===id),q=x?x.qty:0;if(q>=Number(p.stock))return alert('Estoque insuficiente');if(x)x.qty++;else cart.push({id,qty:1});renderCart()}
+function renderCart(){$('cart').innerHTML=cart.map(x=>{const p=products.find(y=>y.id===x.id);return `<div class="cartline"><span>${p.name} × ${x.qty}</span><span>${br(Number(p.price)*x.qty)} <button class="secondary" style="width:auto" onclick="del('${x.id}')">×</button></span></div>`}).join('')||'<p class="muted">Carrinho vazio.</p>';$('total').textContent=br(cart.reduce((a,x)=>a+Number(products.find(p=>p.id===x.id).price)*x.qty,0))}
 function del(id){cart=cart.filter(x=>x.id!==id);renderCart()}
-async function checkout(){if(!cart.length)return;try{let s=await call('/sales',{method:'POST',body:JSON.stringify({branch_id:branch.value,payment_method:pay.value,items:cart.map(x=>({product_id:x.id,qty:x.qty}))})});saleMsg.textContent='Venda '+s.id.slice(0,8)+' concluída.';cart=[];await boot()}catch(e){saleMsg.textContent='Venda não concluída: '+e.message}}
-async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:sku.value,name:name.value,barcode:barcode.value,price:+price.value,cost:+cost.value,stock:+stock.value,min_stock:+min.value})});[sku,name,barcode,price,cost,stock,min].forEach(x=>x.value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}
+async function checkout(){if(!cart.length)return;try{const s=await call('/sales',{method:'POST',body:JSON.stringify({branch_id:$('branch').value,payment_method:$('pay').value,items:cart.map(x=>({product_id:x.id,qty:x.qty}))})});$('saleMsg').textContent='Venda '+s.id.slice(0,8)+' concluída.';cart=[];await boot()}catch(e){$('saleMsg').textContent='Venda não concluída: '+e.message}}
+async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:$('sku').value,name:$('name').value,barcode:$('barcode').value,price:+$('price').value,cost:+$('cost').value,stock:+$('stock').value,min_stock:+$('min').value})});['sku','name','barcode','price','cost','stock','min'].forEach(id=>$(id).value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}
 async function logout(){try{if(refreshToken)await fetch('/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})})}catch{}token='';refreshToken='';localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');location.href='app.html?mode=login'}
-const qs=new URLSearchParams(location.search),mode=qs.get('mode'),plan=(qs.get('plan')||'PRO').toUpperCase();if(['BASICO','PRO','PREMIUM'].includes(plan))regPlan.value=plan;updatePlan();if(mode==='signup')showSignup();else showLogin();if(token)boot();
+const qs=new URLSearchParams(location.search),mode=qs.get('mode'),plan=(qs.get('plan')||'PRO').toUpperCase();if(['BASICO','PRO','PREMIUM'].includes(plan))$('regPlan').value=plan;updatePlan();if(mode==='signup')showSignup();else showLogin();if(token)boot();
 </script></body></html>
