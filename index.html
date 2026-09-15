@@ -3,194 +3,76 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Estoque IA V12</title>
+<meta name="theme-color" content="#07111f">
+<title>Estoque IA — Gestão, PDV e Inteligência para seu negócio</title>
+<meta name="description" content="Controle estoque, vendas, PDV, filiais e indicadores em um único sistema. Teste grátis por 14 dias.">
 <style>
-:root{font-family:Inter,system-ui,sans-serif;color:#e8eef8;background:#08111f}
-*{box-sizing:border-box}body{margin:0}.wrap{max-width:1180px;margin:auto;padding:24px}
-.top{display:flex;gap:12px;align-items:center;justify-content:space-between}
-.brand{font-weight:900;font-size:24px}.brand b{color:#48d6a3}
-.card{background:#101c2e;border:1px solid #233550;border-radius:18px;padding:18px;margin-top:18px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.kpi strong{display:block;font-size:28px;margin-top:8px}
-.muted{color:#8fa3bd}.row{display:flex;gap:10px;flex-wrap:wrap}
-input,select,button{border-radius:10px;border:1px solid #2a405f;padding:11px;background:#0b1728;color:#fff}
-input{min-width:150px}button{cursor:pointer;background:#16a678;border:0;font-weight:800}.danger{background:#263750}
-.two{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.products{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.prod{text-align:left;background:#15243a}.cartline{display:flex;justify-content:space-between;border-bottom:1px solid #243750;padding:10px 0}
-table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #243750;text-align:left}
-.login{max-width:440px;margin:8vh auto}.hidden{display:none}.status{padding:7px 10px;border-radius:999px;background:#163e34}
-@media(max-width:800px){.grid,.two,.products{grid-template-columns:1fr}.wrap{padding:14px}}
+:root{--bg:#06101d;--panel:#0d1b2d;--panel2:#11243a;--line:#203854;--text:#eef6ff;--muted:#9db0c6;--green:#1fc89a;--green2:#73e5c5;--blue:#5ca9ff;--shadow:0 24px 70px rgba(0,0,0,.28)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% -10%,#11375a 0,transparent 35%),var(--bg);color:var(--text);font:16px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}a{text-decoration:none;color:inherit}.wrap{width:min(1160px,calc(100% - 36px));margin:auto}
+header{position:sticky;top:0;z-index:20;background:rgba(6,16,29,.86);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.06)}nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{font-size:25px;font-weight:900;letter-spacing:-.7px}.brand b{color:var(--green)}.links{display:flex;gap:26px;color:#c9d7e7;font-size:14px}.actions{display:flex;gap:10px;align-items:center}.btn{display:inline-flex;justify-content:center;align-items:center;min-height:44px;padding:0 18px;border:1px solid var(--line);border-radius:12px;font-weight:800;background:#122238;color:#fff;cursor:pointer}.btn.primary{background:linear-gradient(135deg,var(--green),#10a980);border:0;color:#04150f;box-shadow:0 10px 30px rgba(31,200,154,.18)}.btn.ghost{background:transparent}.hero{padding:92px 0 68px}.hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:58px;align-items:center}.eyebrow{display:inline-flex;gap:8px;align-items:center;border:1px solid #245346;background:#0c2a26;color:var(--green2);padding:7px 11px;border-radius:999px;font-size:13px;font-weight:800}.hero h1{font-size:clamp(42px,6vw,72px);line-height:1.01;letter-spacing:-3px;margin:20px 0}.hero h1 span{color:var(--green)}.hero p{max-width:650px;color:#b7c8da;font-size:19px}.cta{display:flex;gap:12px;flex-wrap:wrap;margin:30px 0 18px}.note{font-size:13px;color:var(--muted)}
+.mock{background:linear-gradient(145deg,#0e2035,#091523);border:1px solid #29415e;border-radius:24px;padding:18px;box-shadow:var(--shadow);transform:perspective(1000px) rotateY(-3deg)}.mock-top{display:flex;justify-content:space-between;align-items:center;padding:4px 4px 17px}.dots{display:flex;gap:6px}.dots i{width:8px;height:8px;border-radius:50%;background:#476078}.live{color:var(--green2);font-size:12px}.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.kpi,.chart{background:#102239;border:1px solid #1f3a59;border-radius:16px;padding:17px}.kpi small{color:var(--muted)}.kpi strong{display:block;font-size:25px;margin-top:5px}.chart{grid-column:1/-1;height:180px;position:relative;overflow:hidden}.bars{position:absolute;inset:45px 18px 18px;display:flex;align-items:end;gap:8px}.bars i{flex:1;background:linear-gradient(var(--green2),#1b7d70);border-radius:5px 5px 2px 2px;opacity:.9}
+section{padding:76px 0}.section-head{text-align:center;max-width:760px;margin:0 auto 42px}.section-head h2{font-size:clamp(32px,4vw,48px);letter-spacing:-1.8px;margin:0 0 12px}.section-head p{color:var(--muted);font-size:18px}.features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.feature{background:linear-gradient(145deg,#0d1c2f,#0a1727);border:1px solid #1c344f;border-radius:18px;padding:24px}.icon{width:42px;height:42px;border-radius:12px;background:#123a34;color:var(--green2);display:grid;place-items:center;font-weight:900;margin-bottom:16px}.feature h3{margin:0 0 8px}.feature p{color:var(--muted);margin:0}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.step{padding:22px;border-top:2px solid #1d5b50;background:#0b192a;border-radius:0 0 16px 16px}.step b{display:block;font-size:18px;margin:10px 0 6px}.step span{color:var(--green);font-weight:900}.step p{color:var(--muted);margin:0;font-size:14px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}.plan{background:#0c1a2b;border:1px solid #203954;border-radius:22px;padding:26px;position:relative}.plan.pop{border-color:#29b990;box-shadow:0 18px 60px rgba(31,200,154,.12)}.tag{position:absolute;right:18px;top:18px;background:#123a34;color:var(--green2);padding:5px 9px;border-radius:999px;font-size:11px;font-weight:900}.price{font-size:40px;font-weight:900;letter-spacing:-2px;margin:14px 0}.price small{font-size:14px;color:var(--muted);letter-spacing:0}.plan ul{list-style:none;padding:0;margin:22px 0;color:#c4d2e2}.plan li{margin:10px 0}.plan li:before{content:"✓";color:var(--green);font-weight:900;margin-right:9px}.plan .btn{width:100%}
+.faq{max-width:850px;margin:auto}.faq details{border-bottom:1px solid #1d344e;padding:20px 2px}.faq summary{font-weight:800;cursor:pointer}.faq p{color:var(--muted)}.final{background:linear-gradient(135deg,#0e2e2b,#0d2137);border:1px solid #255249;border-radius:28px;padding:48px;text-align:center}.final h2{font-size:42px;margin:0 0 10px}.final p{color:#b8cadc}footer{padding:34px 0 48px;color:#8195ab;border-top:1px solid #15283e}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.mobile-menu{display:none}
+@media(max-width:850px){.links{display:none}.hero{padding-top:58px}.hero-grid{grid-template-columns:1fr;gap:36px}.hero h1{letter-spacing:-2px}.mock{transform:none}.features,.plans{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}.actions .ghost{display:none}}
+@media(max-width:520px){.wrap{width:min(100% - 26px,1160px)}nav{height:64px}.brand{font-size:22px}.actions .btn{padding:0 13px}.hero{padding:46px 0}.hero p{font-size:17px}.cta .btn{width:100%}.flow{grid-template-columns:1fr}.final{padding:34px 20px}.final h2{font-size:32px}.kpi strong{font-size:21px}}
 </style>
 </head>
 <body>
-<div id="login" class="wrap login">
- <div class="brand">Estoque <b>IA</b> <span class="muted">V12</span></div>
- <div class="card"><h2>Entrar no sistema</h2>
-  <p class="muted">Conectado ao backend PostgreSQL. Cadastre a primeira empresa se ainda não houver conta.</p>
-  <input id="api" value="" placeholder="API (vazio = este servidor)" style="width:100%"><br><br>
-  <input id="email" placeholder="E-mail" style="width:100%"><br><br>
-  <input id="pass" type="password" placeholder="Senha" style="width:100%"><br><br>
-  <div class="row"><button onclick="login()">Entrar</button><button class="danger" onclick="register()">Criar empresa</button></div>
-  <p id="msg" class="muted"></p>
- </div>
-</div>
+<header><div class="wrap"><nav>
+<a class="brand" href="#">Estoque <b>IA</b></a>
+<div class="links"><a href="#recursos">Recursos</a><a href="#como">Como funciona</a><a href="#planos">Planos</a><a href="#faq">Dúvidas</a></div>
+<div class="actions"><a class="btn ghost" href="app.html">Entrar</a><a class="btn primary" href="app.html">Teste grátis</a></div>
+</nav></div></header>
 
-<div id="app" class="wrap hidden">
- <div class="top"><div class="brand">Estoque <b>IA</b> <span class="muted">V12 Produção</span></div>
- <div><span id="who" class="status"></span> <button class="danger" onclick="logout()">Sair</button></div></div>
+<main>
+<section class="hero"><div class="wrap hero-grid">
+<div><span class="eyebrow">● Estoque IA V13 • SaaS em produção</span>
+<h1>Transforme estoque em <span>resultado.</span></h1>
+<p>Estoque, PDV, vendas, filiais e indicadores em uma plataforma simples para operar hoje e crescer amanhã.</p>
+<div class="cta"><a class="btn primary" href="app.html">Começar teste grátis →</a><a class="btn" href="#planos">Ver planos</a></div>
+<div class="note">14 dias para testar • Comece sem complicação • Acesso pelo celular ou computador</div></div>
+<div class="mock">
+<div class="mock-top"><div class="brand" style="font-size:18px">Estoque <b>IA</b></div><div class="live">● Sistema conectado</div></div>
+<div class="kpis"><div class="kpi"><small>Faturamento</small><strong>R$ 48.920</strong></div><div class="kpi"><small>Vendas</small><strong>1.284</strong></div><div class="kpi"><small>Ticket médio</small><strong>R$ 38,10</strong></div><div class="kpi"><small>Estoque crítico</small><strong>12 SKUs</strong></div>
+<div class="chart"><small style="color:#9db0c6">Movimento do estoque</small><div class="bars"><i style="height:44%"></i><i style="height:61%"></i><i style="height:52%"></i><i style="height:78%"></i><i style="height:67%"></i><i style="height:88%"></i><i style="height:72%"></i><i style="height:94%"></i></div></div></div>
+</div></div></section>
 
- <div class="grid">
-  <div class="card kpi"><span class="muted">Faturamento mês</span><strong id="rev">R$ 0</strong></div>
-  <div class="card kpi"><span class="muted">Vendas</span><strong id="sales">0</strong></div>
-  <div class="card kpi"><span class="muted">Ticket médio</span><strong id="ticket">R$ 0</strong></div>
-  <div class="card kpi"><span class="muted">Estoque crítico</span><strong id="low">0</strong></div>
- </div>
+<section id="recursos"><div class="wrap"><div class="section-head"><h2>Controle o negócio em um só lugar</h2><p>A base da V12 continua operacional. A V13 apresenta o produto com uma experiência comercial mais clara e profissional.</p></div>
+<div class="features">
+<div class="feature"><div class="icon">PDV</div><h3>PDV conectado</h3><p>Venda, localize produtos e mantenha o estoque sincronizado com a operação.</p></div>
+<div class="feature"><div class="icon">↕</div><h3>Estoque inteligente</h3><p>Acompanhe saldo, estoque mínimo, movimentações e produtos que exigem atenção.</p></div>
+<div class="feature"><div class="icon">▥</div><h3>Dashboard gerencial</h3><p>Faturamento, vendas, ticket médio e indicadores para decisões rápidas.</p></div>
+<div class="feature"><div class="icon">IA</div><h3>Inteligência e previsões</h3><p>Estrutura preparada para recomendações, alertas e análises preditivas.</p></div>
+<div class="feature"><div class="icon">⌂</div><h3>Empresas e filiais</h3><p>Arquitetura SaaS multiempresa com separação por tenant e filial.</p></div>
+<div class="feature"><div class="icon">✓</div><h3>Perfis e segurança</h3><p>Acesso autenticado e estrutura de permissões para diferentes usuários.</p></div>
+</div></div></section>
 
- <div class="two">
-  <div>
-   <div class="card"><h2>PDV conectado</h2>
-    <div class="row"><input id="search" placeholder="Buscar SKU, EAN ou produto" oninput="renderProducts()"><select id="branch"></select></div>
-    <div id="products" class="products" style="margin-top:14px"></div>
-   </div>
-   <div class="card"><h2>Novo produto</h2>
-    <div class="row">
-     <input id="sku" placeholder="SKU">
-     <input id="barcode" placeholder="EAN">
-     <input id="product_name" placeholder="Produto">
-     <input id="price" type="number" step=".01" placeholder="Preço">
-     <input id="cost" type="number" step=".01" placeholder="Custo">
-     <input id="stock" type="number" step=".001" placeholder="Estoque">
-     <input id="min_stock" type="number" step=".001" placeholder="Mínimo">
-     <button onclick="addProduct()">Cadastrar</button>
-    </div>
-   </div>
-  </div>
+<section id="como"><div class="wrap"><div class="section-head"><h2>Da inscrição à primeira venda</h2><p>Uma jornada curta para o cliente começar a usar o Estoque IA.</p></div>
+<div class="flow">
+<div class="step"><span>01</span><b>Cadastro</b><p>Empresa, responsável e dados de acesso.</p></div>
+<div class="step"><span>02</span><b>Plano</b><p>Escolha Básico, PRO ou Premium.</p></div>
+<div class="step"><span>03</span><b>Ativação</b><p>Conta e ambiente da empresa são criados.</p></div>
+<div class="step"><span>04</span><b>Onboarding</b><p>Configure filial, produtos e comece a vender.</p></div>
+</div></div></section>
 
-  <div>
-   <div class="card"><h2>Carrinho</h2><div id="cart"></div><h2 id="total">R$ 0</h2>
-    <select id="pay"><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select>
-    <button onclick="checkout()">Finalizar venda</button><p id="saleMsg" class="muted"></p>
-   </div>
-   <div class="card"><h2>Últimas vendas</h2><div style="overflow:auto">
-    <table><thead><tr><th>Data</th><th>Operador</th><th>Pagamento</th><th>Total</th></tr></thead><tbody id="history"></tbody></table>
-   </div></div>
-  </div>
- </div>
-</div>
+<section id="planos"><div class="wrap"><div class="section-head"><h2>Um plano para cada fase</h2><p>Comece pequeno e evolua conforme sua operação cresce.</p></div>
+<div class="plans">
+<div class="plan"><h3>Básico</h3><div class="price">R$ 49,90 <small>/mês</small></div><ul><li>Até 500 produtos</li><li>2 usuários</li><li>1 filial</li><li>Estoque e PDV</li><li>Indicadores essenciais</li></ul><a class="btn" href="app.html">Testar por 14 dias</a></div>
+<div class="plan pop"><span class="tag">MAIS ESCOLHIDO</span><h3>PRO</h3><div class="price">R$ 99,90 <small>/mês</small></div><ul><li>Até 5.000 produtos</li><li>10 usuários</li><li>5 filiais</li><li>Gestão e relatórios</li><li>Recursos avançados</li></ul><a class="btn primary" href="app.html">Começar no PRO</a></div>
+<div class="plan"><h3>Premium</h3><div class="price">R$ 199,90 <small>/mês</small></div><ul><li>Até 50.000 produtos</li><li>50 usuários</li><li>30 filiais</li><li>Operação ampliada</li><li>Estrutura para IA e integrações</li></ul><a class="btn" href="app.html">Testar Premium</a></div>
+</div></div></section>
 
-<script>
-const el=id=>document.getElementById(id);
-let token=localStorage.getItem('v12_token')||'';
-let refreshToken=localStorage.getItem('v12_refresh')||'';
-let products=[],cart=[];
-const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const base=()=>el('api').value.trim().replace(/\/$/,'');
+<section id="faq"><div class="wrap"><div class="section-head"><h2>Dúvidas frequentes</h2></div><div class="faq">
+<details><summary>Preciso instalar o Estoque IA?</summary><p>Não. O acesso é feito pelo navegador no celular ou computador.</p></details>
+<details><summary>Posso testar antes de assinar?</summary><p>Sim. A jornada comercial prevê 14 dias de teste.</p></details>
+<details><summary>O sistema atende mais de uma filial?</summary><p>Sim. Os limites de filiais variam conforme o plano contratado.</p></details>
+<details><summary>O PDV atualiza o estoque?</summary><p>Sim. O fluxo operacional da V12 já registra vendas e baixa de estoque no backend conectado.</p></details>
+</div></div></section>
 
-function readableError(j,status){
- if(typeof j?.error==='string') return j.error;
- if(j?.error?.fieldErrors){
-   const parts=[];
-   for(const [field,msgs] of Object.entries(j.error.fieldErrors))
-     if(msgs?.length) parts.push(field+': '+msgs.join(', '));
-   if(parts.length) return parts.join(' | ');
- }
- if(j?.error?.formErrors?.length) return j.error.formErrors.join(', ');
- if(j?.message) return String(j.message);
- return 'Erro '+status;
-}
+<section><div class="wrap"><div class="final"><h2>Seu estoque pode trabalhar a seu favor.</h2><p>Crie sua empresa, configure seus produtos e experimente o Estoque IA.</p><div class="cta" style="justify-content:center"><a class="btn primary" href="app.html">Começar teste grátis →</a><a class="btn" href="app.html">Já sou cliente</a></div></div></div></section>
+</main>
 
-async function call(path,opt={}){
- let r=await fetch(base()+path,{...opt,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opt.headers||{})}});
- let j=await r.json().catch(()=>({}));
- if(!r.ok) throw Error(readableError(j,r.status));
- return j;
-}
-
-async function login(){
- try{
-  let x=await call('/auth/login',{method:'POST',body:JSON.stringify({email:el('email').value,password:el('pass').value})});
-  token=x.access_token;refreshToken=x.refresh_token||'';
-  localStorage.setItem('v12_token',token);localStorage.setItem('v12_refresh',refreshToken);localStorage.setItem('v12_api',base());
-  await boot();
- }catch(e){el('msg').textContent='Falha no login: '+e.message}
-}
-
-async function register(){
- let company=prompt('Nome da empresa:');let personName=prompt('Seu nome:');
- if(!company||!personName)return;
- try{
-  let x=await call('/auth/register',{method:'POST',body:JSON.stringify({company,name:personName,email:el('email').value,password:el('pass').value})});
-  token=x.access_token;refreshToken=x.refresh_token||'';
-  localStorage.setItem('v12_token',token);localStorage.setItem('v12_refresh',refreshToken);localStorage.setItem('v12_api',base());
-  await boot();
- }catch(e){el('msg').textContent='Cadastro não concluído: '+e.message}
-}
-
-async function boot(){
- try{
-  let [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);
-  el('login').classList.add('hidden');el('app').classList.remove('hidden');
-  el('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;
-  el('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
-  products=p;el('rev').textContent=br(d.revenue);el('sales').textContent=d.sales;el('ticket').textContent=br(d.ticket);el('low').textContent=d.low_stock;
-  el('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');
-  renderProducts();renderCart();
- }catch(e){
-  if(token){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken=''}
-  el('login').classList.remove('hidden');el('app').classList.add('hidden');el('msg').textContent='Conecte a API e faça login. '+e.message;
- }
-}
-
-function renderProducts(){
- let q=(el('search').value||'').toLowerCase();
- el('products').innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q))
- .map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>';
-}
-function addCart(id){
- let p=products.find(x=>x.id===id),x=cart.find(x=>x.id===id);let q=x?x.qty:0;
- if(q>=Number(p.stock))return alert('Estoque insuficiente');
- if(x)x.qty++;else cart.push({id,qty:1});renderCart();
-}
-function renderCart(){
- el('cart').innerHTML=cart.map(x=>{let p=products.find(y=>y.id===x.id);return `<div class="cartline"><span>${p.name} × ${x.qty}</span><span>${br(Number(p.price)*x.qty)} <button class="danger" onclick="del('${x.id}')">×</button></span></div>`}).join('')||'<p class="muted">Carrinho vazio.</p>';
- el('total').textContent=br(cart.reduce((a,x)=>a+Number(products.find(p=>p.id===x.id).price)*x.qty,0));
-}
-function del(id){cart=cart.filter(x=>x.id!==id);renderCart()}
-async function checkout(){
- if(!cart.length)return;
- try{
-  let s=await call('/sales',{method:'POST',body:JSON.stringify({branch_id:el('branch').value,payment_method:el('pay').value,items:cart.map(x=>({product_id:x.id,qty:x.qty}))})});
-  el('saleMsg').textContent='Venda '+s.id.slice(0,8)+' concluída no servidor.';cart=[];await boot();
- }catch(e){el('saleMsg').textContent='Venda não concluída: '+e.message}
-}
-
-async function addProduct(){
- const data={
-  sku:el('sku').value.trim(),
-  barcode:el('barcode').value.trim(),
-  name:el('product_name').value.trim(),
-  price:Number(el('price').value),
-  cost:Number(el('cost').value||0),
-  stock:Number(el('stock').value||0),
-  min_stock:Number(el('min_stock').value||0)
- };
- if(!data.sku)return alert('Informe o SKU.');
- if(!data.name)return alert('Informe o nome do produto.');
- if(!Number.isFinite(data.price)||data.price<0)return alert('Informe um preço válido.');
- try{
-  await call('/products',{method:'POST',body:JSON.stringify(data)});
-  ['sku','barcode','product_name','price','cost','stock','min_stock'].forEach(id=>el(id).value='');
-  await boot();
-  alert('Produto cadastrado com sucesso.');
- }catch(e){alert('Produto não cadastrado: '+e.message)}
-}
-
-async function logout(){
- try{if(refreshToken)await fetch(base()+'/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})})}catch{}
- token='';refreshToken='';localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');location.reload();
-}
-
-el('api').value=localStorage.getItem('v12_api')||'';
-if(token)boot();
-</script>
-</body>
-</html>
+<footer><div class="wrap foot"><div><span class="brand" style="font-size:20px">Estoque <b>IA</b></span><br><small>Gestão + PDV + Inteligência</small></div><div>© 2026 Estoque IA • V13 Comercial</div></div></footer>
+</body></html>
