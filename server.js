@@ -63,4 +63,46 @@ app.get('/reports/dashboard',auth,async(req,res)=>{const k=(await db.query("SELE
 app.get('/audit',auth,role('ADMIN'),async(req,res)=>res.json((await db.query('SELECT action,metadata,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.tenant_id])).rows));
 app.use(express.static(__dirname));app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
 app.use((e,req,res,next)=>{console.error(e);res.status(500).json({error:'internal_error'})});
+app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
+  try {
+    if (!process.env.MP_ACCESS_TOKEN) {
+      return res.status(503).json({
+        error: 'MP_ACCESS_TOKEN_not_configured'
+      });
+    }
+
+    const r = await fetch('https://api.mercadopago.com/users/test', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        site_id: 'MLB'
+      })
+    });
+
+    const data = await r.json();
+
+    if (!r.ok) {
+      return res.status(r.status).json({
+        error: data?.error || 'mercadopago_error',
+        message: data?.message || null
+      });
+    }
+
+    return res.json({
+      id: data.id,
+      nickname: data.nickname,
+      email: data.email,
+      site_status: data.site_status
+    });
+
+  } catch (e) {
+    console.error('[MP test user]', e?.message);
+    return res.status(500).json({
+      error: 'test_user_creation_failed'
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
