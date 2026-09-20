@@ -86,6 +86,7 @@ app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
     const data = await r.json();
 
     if (!r.ok) {
+      console.error('[MP create test user]', { http_status: r.status, error: data?.error || null, message: data?.message || null, cause: data?.cause || null });
       return res.status(r.status).json({
         error: data?.error || 'mercadopago_error',
         message: data?.message || null
