@@ -78,7 +78,8 @@ app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        site_id: 'MLB'
+        site_id: 'MLB',
+        description: 'Buyer Estoque IA'
       })
     });
 
