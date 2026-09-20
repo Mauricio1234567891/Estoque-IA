@@ -114,4 +114,31 @@ async function checkout(){if(!cart.length)return;try{const s=await call('/sales'
 async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:$('sku').value,name:$('name').value,barcode:$('barcode').value,price:+$('price').value,cost:+$('cost').value,stock:+$('stock').value,min_stock:+$('min').value})});['sku','name','barcode','price','cost','stock','min'].forEach(id=>$(id).value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}
 async function logout(){try{if(refreshToken)await fetch('/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})})}catch{}token='';refreshToken='';localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');location.href='app.html?mode=login'}
 const qs=new URLSearchParams(location.search),mode=qs.get('mode'),plan=(qs.get('plan')||'PRO').toUpperCase();if(['BASICO','PRO','PREMIUM'].includes(plan))$('regPlan').value=plan;updatePlan();if(mode==='signup')showSignup();else showLogin();if(token)boot();
-</script></body></html>
+async function criarUsuarioTesteMP(){
+  const btn=document.getElementById('mpTestBtn');
+  try{
+    btn.disabled=true;
+    btn.textContent='Criando...';
+
+    const x=await call('/admin/create-mp-test-user');
+
+    alert(
+      'USUÁRIO DE TESTE CRIADO\n\n' +
+      'Email: ' + (x.email||'não retornado') +
+      '\nID: ' + (x.id||'') +
+      '\nUsuário: ' + (x.nickname||'')
+    );
+  }catch(e){
+    alert('Erro ao criar usuário de teste: '+e.message);
+  }finally{
+    btn.disabled=false;
+    btn.textContent='Gerar comprador teste MP';
+  }
+}
+
+const mpTestBtn=document.createElement('button');
+mpTestBtn.id='mpTestBtn';
+mpTestBtn.textContent='Gerar comprador teste MP';
+mpTestBtn.onclick=criarUsuarioTesteMP;
+mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
+document.body.appendChild(mpTestBtn);</script></body></html>
