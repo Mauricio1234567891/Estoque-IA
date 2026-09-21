@@ -63,6 +63,32 @@ app.get('/reports/dashboard',auth,async(req,res)=>{const k=(await db.query("SELE
 app.get('/audit',auth,role('ADMIN'),async(req,res)=>res.json((await db.query('SELECT action,metadata,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.tenant_id])).rows));
 app.use(express.static(__dirname));app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
 app.use((e,req,res,next)=>{console.error(e);res.status(500).json({error:'internal_error'})});
+app.get('/admin/mp-whoami', auth, role('ADMIN'), async (req,res)=>{
+  try{
+    const r=await fetch('https://api.mercadopago.com/users/me',{
+      headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`}
+    });
+    const data=await r.json();
+
+    console.log('[MP whoami]',{
+      http_status:r.status,
+      id:data?.id||null,
+      nickname:data?.nickname||null,
+      site_id:data?.site_id||null
+    });
+
+    res.status(r.status).json({
+      http_status:r.status,
+      id:data?.id||null,
+      nickname:data?.nickname||null,
+      site_id:data?.site_id||null,
+      error:data?.error||null,
+      message:data?.message||null
+    });
+  }catch(e){
+    res.status(500).json({error:'mp_whoami_failed'});
+  }
+});
 app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
   try {
     if (!process.env.MP_ACCESS_TOKEN) {
