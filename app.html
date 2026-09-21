@@ -141,4 +141,24 @@ mpTestBtn.id='mpTestBtn';
 mpTestBtn.textContent='Gerar comprador teste MP';
 mpTestBtn.onclick=criarUsuarioTesteMP;
 mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
-document.body.appendChild(mpTestBtn);</script></body></html>
+document.body.appendChild(mpTestBtn);
+async function verificarMercadoPago(){
+  try{
+    const x=await call('/admin/mp-whoami');
+    alert(
+      'DIAGNÓSTICO MERCADO PAGO\n\n' +
+      'ID: ' + (x.id||'não retornado') +
+      '\nUsuário: ' + (x.nickname||'não retornado') +
+      '\nSite: ' + (x.site_id||'não retornado') +
+      '\nHTTP: ' + (x.http_status||'')
+    );
+  }catch(e){
+    alert('Erro no diagnóstico Mercado Pago: '+e.message);
+  }
+}
+
+const mpWhoBtn=document.createElement('button');
+mpWhoBtn.textContent='Verificar Mercado Pago';
+mpWhoBtn.onclick=verificarMercadoPago;
+mpWhoBtn.style.cssText='position:fixed;bottom:85px;right:20px;z-index:9999;padding:14px;background:#2563eb;color:white;border:0;border-radius:10px;font-weight:bold';
+document.body.appendChild(mpWhoBtn);</script></body></html>
