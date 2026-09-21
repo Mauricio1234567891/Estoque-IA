@@ -144,7 +144,7 @@ mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padd
 document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
   try{
-    const x=await call('/admin/mp-whoami');
+    const x=await call('/admin/test-mp-plan');
     alert(
       'DIAGNÓSTICO MERCADO PAGO\n\n' +
       'ID: ' + (x.id||'não retornado') +
