@@ -133,4 +133,50 @@ app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
     });
   }
 });
+app.get('/admin/test-mp-plan',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const body={
+      reason:'Estoque IA PRO TESTE',
+      auto_recurring:{
+        frequency:1,
+        frequency_type:'months',
+        transaction_amount:99.90,
+        currency_id:'BRL'
+      },
+      back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com'
+    };
+
+    const r=await fetch('https://api.mercadopago.com/preapproval_plan',{
+      method:'POST',
+      headers:{
+        Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify(body)
+    });
+
+    const data=await r.json();
+
+    console.log('[MP plan test]',{
+      http_status:r.status,
+      id:data?.id||null,
+      status:data?.status||null,
+      message:data?.message||null
+    });
+
+    return res.status(r.status).json({
+      http_status:r.status,
+      id:data?.id||null,
+      status:data?.status||null,
+      init_point:data?.init_point||null,
+      error:data?.error||null,
+      message:data?.message||null
+    });
+  }catch(e){
+    console.error('[MP plan test error]',e?.message);
+    return res.status(500).json({
+      error:'mp_plan_test_failed'
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
