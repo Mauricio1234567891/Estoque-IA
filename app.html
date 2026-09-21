@@ -145,6 +145,7 @@ document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
   try{
     const x=await call('/admin/test-mp-plan');
+    if(x.init_point){window.location.href=x.init_point;return;}
     alert(
       'DIAGNÓSTICO MERCADO PAGO\n\n' +
       'ID: ' + (x.id||'não retornado') +
