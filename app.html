@@ -144,15 +144,19 @@ mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padd
 document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
   try{
-    const x=await call('/admin/test-mp-plan');
-    if(x.init_point){window.location.href=x.init_point;return;}
-    alert(
-      'DIAGNÓSTICO MERCADO PAGO\n\n' +
-      'ID: ' + (x.id||'não retornado') +
-      '\nUsuário: ' + (x.nickname||'não retornado') +
-      '\nSite: ' + (x.site_id||'não retornado') +
-      '\nHTTP: ' + (x.http_status||'')
-    );
+    const x=await call('/admin/test-mp-subscriptions');
+
+    const s=(x.results||[])[0];
+
+alert(
+  'ASSINATURA MERCADO PAGO\n\n' +
+  'HTTP: ' + (x.http_status||'') +
+  '\nID: ' + (s?.id||'não encontrada') +
+  '\nStatus: ' + (s?.status||'não encontrado') +
+  '\nPlano ID: ' + (s?.preapproval_plan_id||'não encontrado') +
+  '\nReferência: ' + (s?.external_reference||'não informada') +
+  '\nPróxima cobrança: ' + (s?.next_payment_date||'não informada')
+);
   }catch(e){
     alert('Erro no diagnóstico Mercado Pago: '+e.message);
   }
