@@ -179,4 +179,30 @@ app.get('/admin/test-mp-plan',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.get('/admin/test-mp-subscriptions',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const r=await fetch('https://api.mercadopago.com/preapproval/search?status=authorized',{
+      headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`}
+    });
+    const data=await r.json();
+
+    return res.status(r.status).json({
+      http_status:r.status,
+      results:(data.results||[]).map(x=>({
+        id:x.id,
+        status:x.status,
+        reason:x.reason,
+        preapproval_plan_id:x.preapproval_plan_id,
+        external_reference:x.external_reference,
+        payer_id:x.payer_id,
+        next_payment_date:x.next_payment_date
+      }))
+    });
+  }catch(e){
+    return res.status(500).json({
+      error:'mp_subscription_search_failed'
+    });
+  }
+});
+
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
