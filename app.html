@@ -145,20 +145,28 @@ document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
   try{
     const x=await call('/admin/test-mp-subscriptions');
-
     const s=(x.results||[])[0];
 
-alert(
-  'ASSINATURA MERCADO PAGO\n\n' +
-  'HTTP: ' + (x.http_status||'') +
-  '\nID: ' + (s?.id||'não encontrada') +
-  '\nStatus: ' + (s?.status||'não encontrado') +
-  '\nPlano ID: ' + (s?.preapproval_plan_id||'não encontrado') +
-  '\nReferência: ' + (s?.external_reference||'não informada') +
-  '\nPróxima cobrança: ' + (s?.next_payment_date||'não informada')
-);
+    if(!s?.id){
+      alert('Nenhuma assinatura autorizada encontrada.');
+      return;
+    }
+
+    const y=await call('/admin/test-mp-link/'+s.id,{
+      method:'PUT'
+    });
+
+    alert(
+      'VINCULAÇÃO MERCADO PAGO\n\n' +
+      'HTTP: ' + (y.http_status||'') +
+      '\nID: ' + (y.id||'') +
+      '\nStatus: ' + (y.status||'') +
+      '\nPlano ID: ' + (y.preapproval_plan_id||'') +
+      '\nReferência: ' + (y.external_reference||'não informada') +
+      '\nPróxima cobrança: ' + (y.next_payment_date||'')
+    );
   }catch(e){
-    alert('Erro no diagnóstico Mercado Pago: '+e.message);
+    alert('Erro ao vincular assinatura: '+e.message);
   }
 }
 
