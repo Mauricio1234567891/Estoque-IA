@@ -142,33 +142,29 @@ mpTestBtn.textContent='Gerar comprador teste MP';
 mpTestBtn.onclick=criarUsuarioTesteMP;
 mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
 document.body.appendChild(mpTestBtn);
-async function verificarMercadoPago(){
+async function async function verificarMercadoPago(){
   try{
-    const x=await call('/admin/test-mp-subscriptions');
-    const s=(x.results||[])[0];
-
-    if(!s?.id){
-      alert('Nenhuma assinatura autorizada encontrada.');
-      return;
-    }
-
-    const y=await call('/admin/test-mp-link/'+s.id,{
-      method:'PUT'
+    const x=await call('/admin/test-pro-checkout-v2',{
+      method:'POST'
     });
 
     alert(
-      'VINCULAÇÃO MERCADO PAGO\n\n' +
-      'HTTP: ' + (y.http_status||'') +
-      '\nID: ' + (y.id||'') +
-      '\nStatus: ' + (y.status||'') +
-      '\nPlano ID: ' + (y.preapproval_plan_id||'') +
-      '\nReferência: ' + (y.external_reference||'não informada') +
-      '\nPróxima cobrança: ' + (y.next_payment_date||'')
+      'TESTE CHECKOUT PRO V2\n\n' +
+      'HTTP: ' + (x.http_status||'') +
+      '\nID: ' + (x.id||'não informado') +
+      '\nStatus: ' + (x.status||'não informado') +
+      '\nPlano ID: ' + (x.preapproval_plan_id||'não informado') +
+      '\nReferência: ' + (x.external_reference||'não informada') +
+      '\nCheckout: ' + (x.init_point ? 'SIM' : 'NÃO') +
+      '\nErro: ' + (x.message||x.error||'nenhum')
     );
   }catch(e){
-    alert('Erro ao vincular assinatura: '+e.message);
+    alert('Erro no teste PRO V2: '+e.message);
   }
 }
+
+  
+  
 
 const mpWhoBtn=document.createElement('button');
 mpWhoBtn.textContent='Verificar Mercado Pago';
