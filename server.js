@@ -286,5 +286,34 @@ app.post('/admin/test-pro-checkout-v2',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.get('/admin/test-pro-plan-checkout',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const planId='5822c3013f85418fa0f55728f6804b5d';
 
+    const r=await fetch(
+      `https://api.mercadopago.com/preapproval_plan/${planId}`,
+      {
+        headers:{
+          Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    const data=await r.json();
+
+    return res.status(r.status).json({
+      http_status:r.status,
+      plan_id:data?.id||null,
+      status:data?.status||null,
+      init_point:data?.init_point||null,
+      message:data?.message||null
+    });
+
+  }catch(e){
+    return res.status(500).json({
+      error:'pro_plan_checkout_failed',
+      message:e?.message||null
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
