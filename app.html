@@ -142,7 +142,7 @@ mpTestBtn.textContent='Gerar comprador teste MP';
 mpTestBtn.onclick=criarUsuarioTesteMP;
 mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
 document.body.appendChild(mpTestBtn);
-async function async function verificarMercadoPago(){
+async function verificarMercadoPago(){
   try{
     const x=await call('/admin/test-pro-checkout-v2',{
       method:'POST'
