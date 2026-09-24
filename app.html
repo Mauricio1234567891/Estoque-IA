@@ -144,9 +144,7 @@ mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padd
 document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
   try{
-    const x=await call('/admin/test-pro-checkout-v2',{
-      method:'POST'
-    });
+    const x=await call('/admin/test-pro-plan-checkout');
 
     alert(
       'TESTE CHECKOUT PRO V2\n\n' +
