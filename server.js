@@ -237,4 +237,54 @@ app.put('/admin/test-mp-link/:id',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.post('/admin/test-pro-checkout-v2',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const tenantId=String(req.user.tenant_id);
+
+    const email=(await db.query(
+      'SELECT email FROM users WHERE id=$1',
+      [req.user.sub]
+    )).rows[0]?.email;
+
+    const payerEmail=process.env.MP_TEST_PAYER_EMAIL||email;
+
+    const body={
+      preapproval_plan_id:'5822c3013f85418fa0f55728f6804b5d',
+      reason:'Estoque IA PRO',
+      external_reference:tenantId,
+      payer_email:payerEmail,
+      back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com',
+      status:'pending'
+    };
+
+    const r=await fetch('https://api.mercadopago.com/preapproval',{
+      method:'POST',
+      headers:{
+        Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify(body)
+    });
+
+    const data=await r.json();
+
+    return res.status(r.status).json({
+      http_status:r.status,
+      id:data?.id||null,
+      status:data?.status||null,
+      external_reference:data?.external_reference||null,
+      preapproval_plan_id:data?.preapproval_plan_id||null,
+      init_point:data?.init_point||null,
+      error:data?.error||null,
+      message:data?.message||null
+    });
+
+  }catch(e){
+    return res.status(500).json({
+      error:'mp_pro_checkout_v2_failed',
+      message:e?.message||null
+    });
+  }
+});
+
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
