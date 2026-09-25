@@ -142,31 +142,33 @@ mpTestBtn.textContent='Gerar comprador teste MP';
 mpTestBtn.onclick=criarUsuarioTesteMP;
 mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
 document.body.appendChild(mpTestBtn);
-async function verificarMercadoPago(){
+
+
+
+  async function verificarMercadoPago(){
   try{
-    const x=await call('/admin/test-mp-subscriptions');
+    const x=await call('/admin/create-missing-mp-plans',{
+      method:'POST'
+    });
+
     const lista=x.results||[];
 
-    if(!lista.length){
-      alert('Nenhuma assinatura encontrada.');
-      return;
-    }
-
-    const s=lista[0];
-
     alert(
-      'ASSINATURA ENCONTRADA\n\n' +
-      'ID: ' + (s.id||'não informado') +
-      '\nStatus: ' + (s.status||'não informado') +
-      '\nPlano ID: ' + (s.preapproval_plan_id||'não informado') +
-      '\nReferência: ' + (s.external_reference||'não informada') +
-      '\nPróxima cobrança: ' + (s.next_payment_date||'não informada')
+      'PLANOS CRIADOS\n\n' +
+      lista.map(p =>
+        p.plano +
+        '\nID: ' + (p.id||'ERRO') +
+        '\nStatus: ' + (p.status||'não informado') +
+        '\nHTTP: ' + (p.http_status||'') +
+        '\nErro: ' + (p.message||p.error||'nenhum')
+      ).join('\n\n')
     );
 
   }catch(e){
-    alert('Erro ao consultar assinatura: '+e.message);
-   }
-  }   
+    alert('Erro ao criar planos: '+e.message);
+  }
+  }
+    
 
   
     
