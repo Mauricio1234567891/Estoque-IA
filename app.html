@@ -143,18 +143,33 @@ mpTestBtn.onclick=criarUsuarioTesteMP;
 mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
 document.body.appendChild(mpTestBtn);
 async function verificarMercadoPago(){
-  try{const x=await call('/admin/test-pro-plan-checkout');
-    if(x.init_point){
-  window.location.href=x.init_point;
-  return;
-}
+  try{
+    const x=await call('/admin/test-mp-subscriptions');
+    const lista=x.results||[];
 
-alert('Checkout do Mercado Pago não foi retornado.');
+    if(!lista.length){
+      alert('Nenhuma assinatura encontrada.');
+      return;
+    }
+
+    const s=lista[0];
+
+    alert(
+      'ASSINATURA ENCONTRADA\n\n' +
+      'ID: ' + (s.id||'não informado') +
+      '\nStatus: ' + (s.status||'não informado') +
+      '\nPlano ID: ' + (s.preapproval_plan_id||'não informado') +
+      '\nReferência: ' + (s.external_reference||'não informada') +
+      '\nPróxima cobrança: ' + (s.next_payment_date||'não informada')
+    );
+
   }catch(e){
-    alert('Erro no teste PRO V2: '+e.message);
-  }
-}
+    alert('Erro ao consultar assinatura: '+e.message);
+   }
+  }   
 
+  
+    
   
   
 
