@@ -316,4 +316,59 @@ app.get('/admin/test-pro-plan-checkout',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.post('/admin/create-missing-mp-plans',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const planos=[
+      {codigo:'BASICO',reason:'Estoque IA Básico',amount:49.90},
+      {codigo:'PREMIUM',reason:'Estoque IA Premium',amount:199.90}
+    ];
+
+    const resultados=[];
+
+    for(const p of planos){
+      const body={
+        reason:p.reason,
+        auto_recurring:{
+          frequency:1,
+          frequency_type:'months',
+          transaction_amount:p.amount,
+          currency_id:'BRL'
+        },
+        back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com'
+      };
+
+      const r=await fetch(
+        'https://api.mercadopago.com/preapproval_plan',
+        {
+          method:'POST',
+          headers:{
+            Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify(body)
+        }
+      );
+
+      const data=await r.json();
+
+      resultados.push({
+        plano:p.codigo,
+        http_status:r.status,
+        id:data?.id||null,
+        status:data?.status||null,
+        init_point:data?.init_point||null,
+        error:data?.error||null,
+        message:data?.message||null
+      });
+    }
+
+    return res.json({results:resultados});
+
+  }catch(e){
+    return res.status(500).json({
+      error:'create_missing_mp_plans_failed',
+      message:e?.message||null
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
