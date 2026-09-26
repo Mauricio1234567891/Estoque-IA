@@ -44,6 +44,32 @@
 <script>
 const $=id=>document.getElementById(id);
 let token=localStorage.getItem('v12_token')||'',refreshToken=localStorage.getItem('v12_refresh')||'',products=[],cart=[];
+  let mp=null;
+
+async function initMercadoPago(){
+  try{
+    const r=await fetch('/billing/config');
+    const cfg=await r.json();
+
+    if(!r.ok||!cfg.public_key){
+      throw new Error('Public Key não configurada');
+    }
+
+    if(typeof MercadoPago!=='function'){
+      throw new Error('SDK do Mercado Pago não carregou');
+    }
+
+    mp=new MercadoPago(cfg.public_key,{
+      locale:'pt-BR'
+    });
+
+    console.log('Mercado Pago inicializado');
+  }catch(e){
+    console.error('Erro ao inicializar Mercado Pago:',e.message);
+  }
+}
+
+initMercadoPago();
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function readableError(j,status){
  if(typeof j?.error==='string'){
