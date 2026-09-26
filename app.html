@@ -73,7 +73,66 @@ async function initMercadoPago(){
   }
 }
 
-initMercadoPago();setTimeout(()=>{
+
+  async function renderPaymentBrick(plan){
+  const container=$('paymentBrickContainer');
+  const msg=$('billingMsg');
+
+  if(!mp){
+    msg.textContent='Mercado Pago ainda não inicializado.';
+    return;
+  }
+
+  const prices={
+    BASICO:49.90,
+    PRO:99.90,
+    PREMIUM:199.90
+  };
+
+  selectedBillingPlan=plan;
+  msg.textContent='Carregando pagamento...';
+
+  try{
+    if(cardPaymentBrickController){
+      await cardPaymentBrickController.unmount();
+      cardPaymentBrickController=null;
+    }
+
+    container.innerHTML='';
+    bricksBuilder=mp.bricks();
+
+    const settings={
+      initialization:{
+        amount:prices[plan]
+      },
+      callbacks:{
+        onReady:()=>{
+          msg.textContent='Preencha os dados do cartão para assinar o plano.';
+        },
+        onSubmit:(formData)=>{
+          console.log('Token gerado:',!!formData?.token);
+          msg.textContent='Cartão validado. Nenhuma cobrança foi realizada.';
+          return Promise.resolve();
+        },
+        onError:(error)=>{
+          console.error('Mercado Pago Brick:',error);
+          msg.textContent='Erro ao carregar o pagamento.';
+        }
+      }
+    };
+
+    cardPaymentBrickController=await bricksBuilder.create(
+      'cardPayment',
+      'paymentBrickContainer',
+      settings
+    );
+
+  }catch(e){
+    console.error(e);
+    msg.textContent='Não foi possível carregar o formulário de pagamento.';
+  }
+  }
+  initMercadoPago();setTimeout(()=>{
   alert(mp ? 'Mercado Pago SDK: OK' : 'Mercado Pago SDK: ERRO');
 },2000);
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
