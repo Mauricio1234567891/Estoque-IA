@@ -69,7 +69,9 @@ async function initMercadoPago(){
   }
 }
 
-initMercadoPago();
+initMercadoPago();setTimeout(()=>{
+  alert(mp ? 'Mercado Pago SDK: OK' : 'Mercado Pago SDK: ERRO');
+},2000);
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function readableError(j,status){
  if(typeof j?.error==='string'){
