@@ -46,6 +46,9 @@
 const $=id=>document.getElementById(id);
 let token=localStorage.getItem('v12_token')||'',refreshToken=localStorage.getItem('v12_refresh')||'',products=[],cart=[];
   let mp=null;
+  let bricksBuilder=null;
+let cardPaymentBrickController=null;
+let selectedBillingPlan=null;
 
 async function initMercadoPago(){
   try{
