@@ -187,14 +187,13 @@ async function loadSubscription(){
 }
 function openSubscription(){$('subscriptionModal').classList.remove('hidden');$('subscriptionModal').scrollIntoView({behavior:'smooth'})}
 async function checkoutPlan(plan){
- const m=$('billingMsg');m.textContent='Preparando checkout seguro...';
- try{
-   const x=await call('/billing/checkout',{method:'POST',body:JSON.stringify({plan})});
-   if(x.checkout_url){m.textContent='Redirecionando para o pagamento...';location.href=x.checkout_url;return}
-   if(x.mode==='demo'){m.textContent='Cobrança real ainda não configurada no servidor. Nenhuma assinatura foi vendida.';return}
-   m.textContent='Checkout criado. Aguarde a confirmação do pagamento.';
- }catch(e){m.textContent='Não foi possível iniciar a assinatura: '+e.message}
-}
+  const m=$('billingMsg');
+
+  selectedBillingPlan=plan;
+  m.textContent='Preparando pagamento do plano '+plan+'...';
+
+  await renderPaymentBrick(plan);
+  }
 
 async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');renderProducts();renderCart();loadSubscription()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
 function renderProducts(){const q=($('search').value||'').toLowerCase();$('products').innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q)).map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>'}
