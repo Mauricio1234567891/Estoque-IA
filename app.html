@@ -102,10 +102,16 @@ async function initMercadoPago(){
     bricksBuilder=mp.bricks();
 
     const settings={
-      initialization:{
-        amount:prices[plan]
-      },
-      callbacks:{
+  initialization:{
+    amount:prices[plan]
+  },
+  customization:{
+    paymentMethods:{
+      minInstallments:1,
+      maxInstallments:1
+    }
+  },
+  callbacks:{
         onReady:()=>{
           msg.textContent='Preencha os dados do cartão para assinar o plano.';
         },
