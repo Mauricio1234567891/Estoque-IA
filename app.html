@@ -109,11 +109,38 @@ async function initMercadoPago(){
         onReady:()=>{
           msg.textContent='Preencha os dados do cartão para assinar o plano.';
         },
-        onSubmit:(formData)=>{
-          console.log('Token gerado:',!!formData?.token);
-          msg.textContent='Cartão validado. Nenhuma cobrança foi realizada.';
-          return Promise.resolve();
-        },
+        onSubmit:async(formData)=>{
+  try{
+    const cardTokenId=formData?.token;
+
+    if(!cardTokenId){
+      throw new Error('O Mercado Pago não gerou o token do cartão.');
+    }
+
+    msg.textContent='Criando sua assinatura...';
+
+    const result=await call('/billing/checkout',{
+      method:'POST',
+      body:JSON.stringify({
+        plan:selectedBillingPlan,
+        card_token_id:cardTokenId
+      })
+    });
+
+    msg.textContent=result.status==='authorized'
+      ? 'Assinatura criada com sucesso.'
+      : 'Assinatura enviada. Status: '+(result.status||'processando');
+
+    await loadSubscription();
+
+    return result;
+
+  }catch(e){
+    console.error('Erro ao criar assinatura:',e);
+    msg.textContent='Não foi possível criar a assinatura: '+e.message;
+    throw e;
+  }
+},
         onError:(error)=>{
           console.error('Mercado Pago Brick:',error);
           msg.textContent='Erro ao carregar o pagamento.';
