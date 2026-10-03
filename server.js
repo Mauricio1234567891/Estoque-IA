@@ -485,4 +485,41 @@ app.post('/admin/create-missing-mp-plans',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.get('/admin/check-mp-pro-plan',auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const planId=process.env.MP_PLAN_PRO_ID;
+
+    if(!planId||!process.env.MP_ACCESS_TOKEN){
+      return res.status(503).json({
+        error:'mp_config_missing'
+      });
+    }
+
+    const r=await fetch(
+      `https://api.mercadopago.com/preapproval_plan/${planId}`,
+      {
+        headers:{
+          Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    const data=await r.json();
+
+    return res.status(r.status).json({
+      http_status:r.status,
+      plan_id:data?.id||null,
+      status:data?.status||null,
+      application_id:data?.application_id||null,
+      collector_id:data?.collector_id||null,
+      error:data?.error||null,
+      message:data?.message||null
+    });
+
+  }catch(e){
+    return res.status(500).json({
+      error:'mp_plan_check_failed'
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
