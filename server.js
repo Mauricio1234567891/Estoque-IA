@@ -111,17 +111,43 @@ app.post('/billing/checkout',auth,role('ADMIN'),async(req,res)=>{
     const data=await r.json();
 
     if(!r.ok){
-      console.error('[MercadoPago subscription]',{
-        http_status:r.status,
-        error:data?.error||null,
-        message:data?.message||null
-      });
-
-      return res.status(502).json({
-        error:'billing_provider_error',
-        message:data?.message||data?.error||'provider_error'
-      });
+  console.error('[MercadoPago subscription]',{
+    http_status:r.status,
+    error:data?.error||null,
+    message:data?.message||null,
+    status:data?.status||null,
+    status_detail:data?.status_detail||null,
+    cause:Array.isArray(data?.cause)
+      ? data.cause.map(c=>({
+          code:c?.code||null,
+          description:c?.description||null
+        }))
+      : null,
+    diagnostic:{
+      plan:plan,
+      preapproval_plan_id:preapprovalPlanId,
+      payer_source:process.env.MP_TEST_PAYER_EMAIL
+        ? 'MP_TEST_PAYER_EMAIL'
+        : 'user.email',
+      has_card_token:Boolean(cardTokenId),
+      external_reference:String(req.user.tenant_id)
     }
+  });
+
+  return res.status(502).json({
+    error:'billing_provider_error',
+    message:data?.message||data?.error||'provider_error',
+    provider_status:r.status,
+    provider_error:data?.error||null,
+    provider_status_detail:data?.status_detail||null,
+    provider_cause:Array.isArray(data?.cause)
+      ? data.cause.map(c=>({
+          code:c?.code||null,
+          description:c?.description||null
+        }))
+      : null
+  });
+}
 
     await db.query(
       `UPDATE tenants
