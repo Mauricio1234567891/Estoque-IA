@@ -548,4 +548,84 @@ app.get('/admin/check-mp-pro-plan',auth,role('ADMIN'),async(req,res)=>{
     });
   }
 });
+app.post('/admin/sync-mp-subscription',
+  auth,role('ADMIN'),async(req,res)=>{
+  try{
+    const subscriptionId=
+      '9675140bd88f4f52a23bfd4acb94aca7';
+
+    if(!process.env.MP_ACCESS_TOKEN){
+      return res.status(503).json({
+        error:'mp_not_configured'
+      });
+    }
+
+    const r=await fetch(
+      'https://api.mercadopago.com/preapproval/'
+      +encodeURIComponent(subscriptionId),
+      {
+        headers:{
+          Authorization:
+            `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    const data=await r.json();
+
+    if(!r.ok){
+      return res.status(502).json({
+        error:'mp_subscription_lookup_failed',
+        http_status:r.status
+      });
+    }
+
+    if(
+      data.id!==subscriptionId ||
+      data.status!=='authorized' ||
+      String(data.external_reference)!==
+        String(req.user.tenant_id) ||
+      data.preapproval_plan_id!==
+        process.env.MP_PLAN_PRO_ID
+    ){
+      return res.status(409).json({
+        error:'subscription_validation_failed',
+        status:data.status||null,
+        tenant_matches:
+          String(data.external_reference)===
+          String(req.user.tenant_id),
+        plan_matches:
+          data.preapproval_plan_id===
+          process.env.MP_PLAN_PRO_ID
+      });
+    }
+
+    await db.query(
+      `UPDATE tenants
+       SET plan='PRO',
+           status='ACTIVE',
+           billing_provider='MERCADO_PAGO',
+           provider_subscription_id=$1
+       WHERE id=$2`,
+      [subscriptionId,req.user.tenant_id]
+    );
+
+    return res.json({
+      ok:true,
+      plan:'PRO',
+      status:'ACTIVE',
+      subscription_id:subscriptionId
+    });
+
+  }catch(e){
+    console.error(
+      '[MP subscription sync]',
+      e?.message
+    );
+
+    return res.status(500).json({
+      error:'subscription_sync_failed'
+    });
+  }
+});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));
