@@ -4,8 +4,9 @@
 <style>
 :root{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef6ff;background:#07111f;--panel:#101e31;--line:#263d59;--muted:#94a8c0;--green:#20c997}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#123453 0,transparent 34%),#07111f}.wrap{max-width:1180px;margin:auto;padding:24px}.auth{max-width:520px;margin:5vh auto}.brand{font-weight:900;font-size:27px}.brand b{color:var(--green)}.card{background:rgba(16,30,49,.96);border:1px solid var(--line);border-radius:20px;padding:24px;margin-top:18px;box-shadow:0 22px 60px rgba(0,0,0,.18)}h1,h2{letter-spacing:-.7px}.muted{color:var(--muted)}.eyebrow{display:inline-block;color:#76e4c6;background:#10352f;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}.form{display:grid;gap:12px}.form.twoform{grid-template-columns:1fr 1fr}.field label{display:block;color:#b7c8da;font-size:13px;margin:0 0 6px}.field input,.field select,input,select,button{width:100%;border-radius:11px;border:1px solid #2a4261;padding:12px;background:#0b1728;color:#fff;font-size:15px}button{cursor:pointer;background:#18b889;border:0;font-weight:850}.secondary{background:#243750}.linkbtn{background:transparent;color:#9edfcf;border:0;padding:7px;width:auto}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{width:auto}.wide{width:100%!important}.notice{background:#0d2c28;border:1px solid #205347;color:#bfeee2;padding:11px;border-radius:11px;font-size:13px}.error{color:#ffb7b7;margin:10px 0 0}.ok{color:#8ff0d3}.top{display:flex;gap:12px;align-items:center;justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.kpi strong{display:block;font-size:28px;margin-top:8px}.two{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.products{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.prod{text-align:left;background:#15243a}.cartline{display:flex;justify-content:space-between;border-bottom:1px solid #243750;padding:10px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #243750;text-align:left}.hidden{display:none}.status{padding:7px 10px;border-radius:999px;background:#163e34}.back{color:#9fb2c8;font-size:14px}.planbox{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#0b1728;border:1px solid #294561;padding:12px;border-radius:12px}.planbox strong{color:#77e5c6}
+.inventory-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.inventory-filters .field{flex:1 1 190px}.inventory-check{display:flex;align-items:center;gap:8px;min-height:44px}.inventory-check input{width:auto;accent-color:var(--green)}.inventory-actions{align-items:center;justify-content:space-between;margin-top:12px}.inventory-table{overflow:auto;margin-top:12px}.inventory-table td,.inventory-table th{white-space:nowrap}button:disabled{opacity:.5;cursor:default}
 @media(max-width:800px){.grid,.two,.products,.form.twoform{grid-template-columns:1fr}.wrap{padding:14px}.auth{margin:3vh auto}.card{padding:20px}.top{align-items:flex-start}.row button{flex:1}}
-</style><script src="https://sdk.mercadopago.com/js/v2"></script>head><body>
+</style><script src="https://sdk.mercadopago.com/js/v2"></script></head><body>
 <div id="auth" class="wrap auth">
 <a class="back" href="index.html">← Voltar ao site</a><div class="brand" style="margin-top:22px">Estoque <b>IA</b></div>
 <div id="loginBox" class="card"><span class="eyebrow">ACESSO DO CLIENTE</span><h1>Entrar no Estoque IA</h1><p class="muted">Acesse sua empresa, produtos, estoque, PDV e indicadores.</p>
@@ -17,6 +18,7 @@
 
 <div id="app" class="wrap hidden"><div class="top"><div class="brand">Estoque <b>IA</b></div><div><span id="who" class="status"></span> <button class="secondary" style="width:auto" onclick="logout()">Sair</button></div></div>
 <div class="grid"><div class="card kpi"><span class="muted">Faturamento mês</span><strong id="rev">R$ 0</strong></div><div class="card kpi"><span class="muted">Vendas</span><strong id="sales">0</strong></div><div class="card kpi"><span class="muted">Ticket médio</span><strong id="ticket">R$ 0</strong></div><div class="card kpi"><span class="muted">Estoque crítico</span><strong id="low">0</strong></div></div>
+<nav class="row" aria-label="Acesso rápido" style="margin-top:12px"><a class="linkbtn" href="#inventoryTitle">Ver posição de estoque ↓</a></nav>
 <div id="subscriptionCard" class="card">
   <div class="top">
     <div>
@@ -24,9 +26,14 @@
       <h2 style="margin-bottom:6px">Plano <span id="subPlan">—</span></h2>
       <div id="subStatus" class="muted">Carregando assinatura...</div>
     </div>
-    <button id="subAction" style="width:auto" onclick="openSubscription()">Assinar / alterar plano</button>
+    <div class="row">
+      <button id="subAction" type="button" class="hidden" onclick="openSubscription()">Assinar</button>
+      <button id="subSync" type="button" class="secondary hidden" onclick="updateSubscription(false)">Atualizar status</button>
+      <button id="subCancel" type="button" class="secondary hidden" onclick="updateSubscription(true)">Cancelar assinatura</button>
+    </div>
   </div>
   <div id="subDetails" class="notice" style="margin-top:14px"></div>
+  <p id="subMessage" class="muted" role="status"></p>
 </div>
 <div id="subscriptionModal" class="card hidden">
   <div class="top"><div><span class="eyebrow">PLANOS ESTOQUE IA</span><h2>Escolha sua assinatura</h2></div><button class="secondary" style="width:auto" onclick="$('subscriptionModal').classList.add('hidden')">Fechar</button></div>
@@ -40,7 +47,51 @@
 </div>
 <div class="two"><div><div class="card"><h2>PDV conectado</h2><div class="row"><input id="search" placeholder="Buscar SKU, EAN ou produto" oninput="renderProducts()"><select id="branch" style="width:auto"></select></div><div id="products" class="products" style="margin-top:14px"></div></div>
 <div class="card"><h2>Novo produto</h2><div class="form twoform"><input id="sku" placeholder="SKU"><input id="barcode" placeholder="EAN"><input id="name" placeholder="Produto"><input id="price" type="number" step=".01" placeholder="Preço"><input id="cost" type="number" step=".01" placeholder="Custo"><input id="stock" type="number" step=".001" placeholder="Estoque"><input id="min" type="number" step=".001" placeholder="Mínimo"><button onclick="addProduct()">Cadastrar produto</button></div></div></div>
-<div><div class="card"><h2>Carrinho</h2><div id="cart"></div><h2 id="total">R$ 0</h2><select id="pay"><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select><button style="margin-top:10px" onclick="checkout()">Finalizar venda</button><p id="saleMsg" class="muted"></p></div><div class="card"><h2>Últimas vendas</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Operador</th><th>Pagamento</th><th>Total</th></tr></thead><tbody id="history"></tbody></table></div></div></div></div></div>
+<div><div class="card"><h2>Carrinho</h2><div id="cart"></div><h2 id="total">R$ 0</h2><select id="pay"><option>Dinheiro</option><option>Pix</option><option>Débito</option><option>Crédito</option></select><button style="margin-top:10px" onclick="checkout()">Finalizar venda</button><p id="saleMsg" class="muted"></p></div><div class="card"><h2>Últimas vendas</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Operador</th><th>Pagamento</th><th>Total</th></tr></thead><tbody id="history"></tbody></table></div></div></div></div>
+<section class="card" aria-labelledby="inventoryTitle">
+  <h2 id="inventoryTitle">Posição de estoque</h2>
+  <p class="muted">Saldo consolidado da empresa. O histórico mostra a filial registrada em cada movimento.</p>
+  <details id="offlineImport" class="hidden" style="margin:12px 0">
+    <summary>Importar produtos da versão offline</summary>
+    <p class="muted">Selecione o backup JSON exportado pelo Estoque IA offline. A importação cadastra produtos e saldos iniciais na empresa atual. SKUs existentes são preservados. Clientes, usuários e vendas ficam no arquivo original.</p>
+    <div class="inventory-filters">
+      <div class="field"><label for="offlineImportFile">Backup JSON</label><input id="offlineImportFile" type="file" accept=".json,application/json"></div>
+      <button id="offlineImportSubmit" type="button" disabled style="width:auto">Importar produtos</button>
+    </div>
+    <p id="offlineImportStatus" class="muted" role="status"></p>
+  </details>
+  <form id="inventoryFilters" class="inventory-filters">
+    <div class="field"><label for="inventorySearch">Produto, SKU ou EAN</label><input id="inventorySearch" maxlength="120" type="search"></div>
+    <label class="inventory-check"><input id="inventoryCritical" type="checkbox"> Somente estoque crítico</label>
+    <button type="submit" style="width:auto">Filtrar</button>
+  </form>
+  <p id="inventoryStatus" class="muted" role="status"></p>
+  <div class="inventory-table">
+    <table aria-label="Saldo dos produtos">
+      <thead><tr><th scope="col">SKU</th><th scope="col">Produto</th><th scope="col">Saldo</th><th scope="col">Mínimo</th><th scope="col">Situação</th><th scope="col">Histórico</th></tr></thead>
+      <tbody id="inventoryRows"></tbody>
+    </table>
+  </div>
+  <div class="row inventory-actions">
+    <button id="inventoryPrev" type="button" class="secondary" disabled>Anterior</button>
+    <span id="inventoryPage" class="muted"></span>
+    <button id="inventoryNext" type="button" class="secondary" disabled>Próxima</button>
+  </div>
+  <section id="inventoryMovements" class="hidden" aria-labelledby="inventoryMovementsTitle">
+    <div class="top" style="margin-top:16px">
+      <h3 id="inventoryMovementsTitle" tabindex="-1"></h3>
+      <button id="inventoryCloseMovements" type="button" class="secondary" style="width:auto">Fechar</button>
+    </div>
+    <p id="inventoryMovementStatus" class="muted" role="status"></p>
+    <div class="inventory-table">
+      <table aria-label="Últimas movimentações">
+        <thead><tr><th scope="col">Data</th><th scope="col">Filial</th><th scope="col">Movimento</th><th scope="col">Quantidade</th></tr></thead>
+        <tbody id="inventoryMovementRows"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+</div>
 
 <script>
 const $=id=>document.getElementById(id);
@@ -49,12 +100,14 @@ let token=localStorage.getItem('v12_token')||'',refreshToken=localStorage.getIte
   let bricksBuilder=null;
 let cardPaymentBrickController=null;
 let selectedBillingPlan=null;
+let isBillingAdmin=false;
 
 async function initMercadoPago(){
   try{
     const r=await fetch('/billing/config');
     const cfg=await r.json();
 
+    if(r.ok && !cfg.enabled) return;
     if(!r.ok||!cfg.public_key){
       throw new Error('Public Key não configurada');
     }
@@ -133,10 +186,10 @@ async function initMercadoPago(){
       })
     });
 
-    msg.textContent=result.status==='authorized'
-      ? 'Assinatura criada com sucesso.'
-      : 'Assinatura enviada. Status: '+(result.status||'processando');
-
+    $('subscriptionModal').classList.add('hidden');
+    $('subMessage').textContent=result.status==='ACTIVE'
+      ? 'Pagamento confirmado e assinatura ativa.'
+      : 'Assinatura enviada. Aguardando confirmação do pagamento.';
     await loadSubscription();
 
     return result;
@@ -165,13 +218,22 @@ async function initMercadoPago(){
     msg.textContent='Não foi possível carregar o formulário de pagamento.';
   }
   }
-  initMercadoPago();setTimeout(()=>{
-  alert(mp ? 'Mercado Pago SDK: OK' : 'Mercado Pago SDK: ERRO');
-},2000);
+const billingReady = initMercadoPago();
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function readableError(j,status){
+ if(j?.error==='invalid_offline_products') {
+   const row = j.row ? ' Produto '+j.row+'.' : '';
+   const field = j.field ? ' Campo '+j.field+'.' : '';
+   return 'O backup contém dados inválidos.'+row+field;
+ }
+ if(j?.error==='duplicate_import_sku') return 'SKU repetido no produto '+j.row+'.';
  if(typeof j?.error==='string'){
-   const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.'};
+   const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.',
+      billing_not_configured:'A contratação está temporariamente indisponível.',
+      subscription_already_exists:'A empresa já tem uma assinatura ou uma contratação em andamento.',
+      subscription_confirmation_pending:'Aguardando confirmação do Mercado Pago. Consulte o status antes de tentar novamente.',
+      billing_provider_error:'O Mercado Pago não confirmou esta operação.',
+      insufficient_stock:'O saldo disponível é insuficiente para esta venda.'};
    return map[j.error]||j.error;
  }
  if(j?.error?.fieldErrors){const p=[];for(const [f,m] of Object.entries(j.error.fieldErrors)){if(m?.length)p.push((f==='password'?'senha':f)+': '+m.join(', '))}if(p.length)return p.join(' | ')}
@@ -209,14 +271,39 @@ function daysLeft(date){if(!date)return null;return Math.max(0,Math.ceil((new Da
 function statusPt(s){return ({TRIAL:'Teste grátis',ACTIVE:'Ativa',PENDING:'Pagamento pendente',PAST_DUE:'Pagamento pendente',CANCELLED:'Cancelada'}[s]||s||'—')}
 async function loadSubscription(){
  try{
-   const s=await call('/billing/subscription');
+   const [s] = await Promise.all([call('/billing/subscription'), billingReady]);
+   const linked = Boolean(s.provider_subscription_id && s.billing_provider === 'MERCADO_PAGO');
+   $('subAction').classList.toggle('hidden', !isBillingAdmin || !mp ||
+     s.checkout_in_progress || !s.can_checkout);
+   $('subSync').classList.toggle('hidden', !isBillingAdmin || !linked || s.checkout_in_progress);
+   $('subCancel').classList.toggle('hidden', !isBillingAdmin || !linked ||
+     s.status === 'CANCELLED' || s.checkout_in_progress);
    $('subPlan').textContent=s.plan||'—';
    $('subStatus').textContent='Status: '+statusPt(s.status);
    const d=daysLeft(s.trial_ends_at);
-   if(s.status==='TRIAL') $('subDetails').textContent=d===0?'Seu teste termina hoje. Assine para continuar usando o sistema.':`Teste grátis: ${d} dia(s) restante(s).`;
+   if(s.checkout_in_progress) $('subDetails').textContent='Contratação aguardando confirmação do Mercado Pago.';
+   else if(s.status==='TRIAL') $('subDetails').textContent=d===0?'Seu teste termina hoje. Assine para continuar usando o sistema.':`Teste grátis: ${d} dia(s) restante(s).`;
    else if(s.status==='ACTIVE') $('subDetails').textContent='Assinatura ativa'+(s.current_period_end?' · período atual até '+new Date(s.current_period_end).toLocaleDateString('pt-BR'):'')+'.';
-   else $('subDetails').textContent='Escolha um plano para manter o acesso aos recursos da assinatura.';
+   else if(s.status==='PENDING') $('subDetails').textContent='Aguardando confirmação do pagamento pelo Mercado Pago.';
+   else if(s.status==='PAST_DUE') $('subDetails').textContent='Pagamento pendente. Consulte o status da assinatura.';
+   else $('subDetails').textContent=mp ? 'Escolha um plano para contratar.' : 'A contratação está temporariamente indisponível.';
  }catch(e){$('subDetails').textContent='Não foi possível carregar a assinatura: '+e.message}
+}
+async function updateSubscription(cancel) {
+  if (cancel && !window.confirm('Cancelar a assinatura e encerrar o acesso aos recursos do plano?')) return;
+  const button = $(cancel ? 'subCancel' : 'subSync');
+  $('subSync').disabled = $('subCancel').disabled = true;
+  $('subMessage').textContent = 'Consultando o Mercado Pago…';
+  try {
+    const result = await call(cancel ? '/billing/cancel' : '/billing/sync', { method: 'POST' });
+    $('subMessage').textContent = 'Status da assinatura atualizado para ' + statusPt(result.status) + '.';
+    await loadSubscription();
+  } catch (error) {
+    $('subMessage').textContent = error.message;
+  } finally {
+    $('subSync').disabled = $('subCancel').disabled = false;
+    if (!button.classList.contains('hidden')) button.focus();
+  }
 }
 function openSubscription(){$('subscriptionModal').classList.remove('hidden');$('subscriptionModal').scrollIntoView({behavior:'smooth'})}
 async function checkoutPlan(plan){
@@ -228,78 +315,262 @@ async function checkoutPlan(plan){
   await renderPaymentBrick(plan);
   }
 
-async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');renderProducts();renderCart();loadSubscription()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
-function renderProducts(){const q=($('search').value||'').toLowerCase();$('products').innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q)).map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>'}
+async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');isBillingAdmin=me.user.role==='ADMIN';$('offlineImport').classList.toggle('hidden',!isBillingAdmin);renderProducts();renderCart();loadSubscription();refreshInventory()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
+const formatStockQuantity = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+let inventoryPage = 1;
+let inventoryFilters = new URLSearchParams();
+let inventoryRequest;
+let movementRequest;
+let inventorySelection;
+
+function inventoryRow(values) {
+  const row = document.createElement('tr');
+  for (const value of values) row.insertCell().textContent = value;
+  return row;
+}
+
+function closeInventoryMovements() {
+  movementRequest?.abort();
+  $('inventoryMovements').classList.add('hidden');
+  inventorySelection?.button.focus();
+  inventorySelection = undefined;
+}
+
+async function refreshInventory() {
+  inventoryRequest?.abort();
+  const request = new AbortController();
+  inventoryRequest = request;
+  const page = inventoryPage;
+  const query = new URLSearchParams(inventoryFilters);
+  query.set('page', String(page));
+  $('inventoryStatus').textContent = 'Carregando posição de estoque…';
+  $('inventoryPrev').disabled = true;
+  $('inventoryNext').disabled = true;
+
+  try {
+    const { items, has_more } = await call('/reports/inventory?' + query, { signal: request.signal });
+    if (request.signal.aborted) return;
+    if (!items.length && page > 1) {
+      inventoryPage = 1;
+      return refreshInventory();
+    }
+    const rows = items.map(product => {
+      const row = inventoryRow([
+        product.sku, product.name, formatStockQuantity.format(product.stock),
+        formatStockQuantity.format(product.min_stock), product.critical ? 'Crítico' : 'Acima do mínimo'
+      ]);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'linkbtn';
+      button.textContent = 'Ver movimentos';
+      button.setAttribute('aria-label', 'Ver movimentos de ' + product.name);
+      button.addEventListener('click', () => showInventoryMovements(product, button));
+      if (inventorySelection?.product.id === product.id) inventorySelection.button = button;
+      row.insertCell().append(button);
+      return row;
+    });
+    $('inventoryRows').replaceChildren(...rows);
+    $('inventoryPage').textContent = items.length ? 'Página ' + page : '';
+    $('inventoryStatus').textContent = items.length ? '' : 'Nenhum produto encontrado.';
+    $('inventoryPrev').disabled = page === 1;
+    $('inventoryNext').disabled = !has_more;
+  } catch (error) {
+    if (request.signal.aborted) return;
+    $('inventoryRows').replaceChildren();
+    $('inventoryPage').textContent = '';
+    $('inventoryPrev').disabled = page === 1;
+    $('inventoryStatus').textContent = 'Não foi possível carregar o estoque. ' + error.message;
+  }
+
+  if (inventorySelection) {
+    const { product, button } = inventorySelection;
+    if (button.isConnected) showInventoryMovements(product, button, false);
+    else closeInventoryMovements();
+  }
+}
+
+async function showInventoryMovements(product, button, focus = true) {
+  inventorySelection = { product, button };
+  movementRequest?.abort();
+  const request = new AbortController();
+  movementRequest = request;
+  $('inventoryMovementsTitle').textContent = 'Movimentações de ' + product.name;
+  $('inventoryMovementStatus').textContent = 'Carregando movimentações…';
+  $('inventoryMovementRows').replaceChildren();
+  $('inventoryMovements').classList.remove('hidden');
+  if (focus) $('inventoryMovementsTitle').focus();
+
+  try {
+    const movements = await call('/reports/inventory/' + product.id + '/movements', { signal: request.signal });
+    if (request.signal.aborted) return;
+    const movementNames = { SALE: 'Venda', SALE_CANCEL: 'Estorno de venda' };
+    const rows = movements.map(m => inventoryRow([
+      new Date(m.created_at).toLocaleString('pt-BR'), m.branch_name,
+      movementNames[m.kind] || m.kind, formatStockQuantity.format(m.qty)
+    ]));
+    $('inventoryMovementRows').replaceChildren(...rows);
+    $('inventoryMovementStatus').textContent = rows.length
+      ? 'Até 50 movimentos mais recentes.'
+      : 'Sem movimentações registradas. O saldo informado no cadastro pode existir sem histórico.';
+  } catch (error) {
+    if (!request.signal.aborted) {
+      $('inventoryMovementStatus').textContent = 'Não foi possível carregar as movimentações. ' + error.message;
+    }
+  }
+}
+
+$('inventoryFilters').addEventListener('submit', event => {
+  event.preventDefault();
+  closeInventoryMovements();
+  inventoryFilters = new URLSearchParams({
+    q: $('inventorySearch').value,
+    critical: $('inventoryCritical').checked ? '1' : '0'
+  });
+  inventoryPage = 1;
+  refreshInventory();
+});
+$('inventoryPrev').addEventListener('click', () => {
+  closeInventoryMovements();
+  inventoryPage -= 1;
+  refreshInventory();
+});
+$('inventoryNext').addEventListener('click', () => {
+  closeInventoryMovements();
+  inventoryPage += 1;
+  refreshInventory();
+});
+$('inventoryCloseMovements').addEventListener('click', closeInventoryMovements);
+
+let offlineProducts;
+
+$('offlineImportFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  const status = $('offlineImportStatus');
+  const submit = $('offlineImportSubmit');
+  offlineProducts = undefined;
+  submit.disabled = true;
+  status.textContent = '';
+  if (!file) return;
+  status.textContent = 'Lendo o backup…';
+
+  try {
+    if (file.size > 20 * 1024 * 1024) throw new Error('O arquivo deve ter até 20 MB.');
+    const backup = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+    if ($('offlineImportFile').files[0] !== file) return;
+    if (!Array.isArray(backup?.produtos) || !backup.produtos.length || backup.produtos.length > 5000) {
+      throw new Error('Selecione um backup com 1 a 5.000 produtos.');
+    }
+
+    // Send only product fields. The rest of the offline backup stays on the device.
+    const mapped = backup.produtos.map((p, index) => {
+      const { sku, nome, barcode, preco, custo, saldo, min } = p ?? {};
+      if (typeof sku !== 'string' || typeof nome !== 'string' ||
+          (barcode !== undefined && typeof barcode !== 'string') ||
+          typeof preco !== 'number' ||
+          [custo, saldo, min].some(value => value !== undefined && typeof value !== 'number')) {
+        throw new Error('O backup contém dados inválidos no produto ' + (index + 1) + '.');
+      }
+      return { sku, nome, barcode, preco, custo, saldo, min };
+    });
+    const size = new TextEncoder().encode(JSON.stringify({ produtos: mapped })).byteLength;
+    if (size >= 1024 * 1024) {
+      offlineProducts = undefined;
+      throw new Error('A lista de produtos excede 1 MB.');
+    }
+
+    offlineProducts = mapped;
+    status.textContent = formatStockQuantity.format(mapped.length) +
+      ' produtos no arquivo. Confirme para importar na empresa atual.';
+    submit.disabled = false;
+  } catch (error) {
+    if ($('offlineImportFile').files[0] !== file) return;
+    status.textContent = error instanceof SyntaxError ? 'O arquivo não é um JSON válido.' : error.message;
+  }
+});
+
+$('offlineImportSubmit').addEventListener('click', async () => {
+  if (!offlineProducts) return;
+  const file = $('offlineImportFile');
+  const submit = $('offlineImportSubmit');
+  const status = $('offlineImportStatus');
+  file.disabled = submit.disabled = true;
+  status.textContent = 'Importando produtos…';
+
+  try {
+    const summary = await call('/products/import-offline', {
+      method: 'POST', body: JSON.stringify({ produtos: offlineProducts })
+    });
+    status.textContent = formatStockQuantity.format(summary.imported) + ' cadastrados. ' +
+      formatStockQuantity.format(summary.skipped) + ' SKUs existentes preservados.';
+    offlineProducts = undefined;
+    file.value = '';
+    await boot();
+  } catch (error) {
+    status.textContent = 'Importação não concluída. ' + error.message;
+  } finally {
+    file.disabled = false;
+    submit.disabled = !offlineProducts;
+  }
+});
+
+function renderProducts() {
+  const query = $('search').value.toLowerCase();
+  const matches = products.filter(p =>
+    (p.name + ' ' + p.sku + ' ' + (p.barcode || '')).toLowerCase().includes(query)
+  );
+  const buttons = matches.map(product => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'prod';
+    button.addEventListener('click', () => addCart(product.id));
+    const name = document.createElement('b');
+    name.textContent = product.name;
+    const info = document.createElement('span');
+    info.className = 'muted';
+    info.textContent = product.sku + ' · estoque ' + product.stock;
+    const price = document.createElement('strong');
+    price.textContent = br(product.price);
+    button.append(name, document.createElement('br'), info, document.createElement('br'), price);
+    return button;
+  });
+  const empty = document.createElement('p');
+  empty.className = 'muted';
+  empty.textContent = 'Nenhum produto.';
+  $('products').replaceChildren(...(buttons.length ? buttons : [empty]));
+}
 function addCart(id){const p=products.find(x=>x.id===id),x=cart.find(x=>x.id===id),q=x?x.qty:0;if(q>=Number(p.stock))return alert('Estoque insuficiente');if(x)x.qty++;else cart.push({id,qty:1});renderCart()}
-function renderCart(){$('cart').innerHTML=cart.map(x=>{const p=products.find(y=>y.id===x.id);return `<div class="cartline"><span>${p.name} × ${x.qty}</span><span>${br(Number(p.price)*x.qty)} <button class="secondary" style="width:auto" onclick="del('${x.id}')">×</button></span></div>`}).join('')||'<p class="muted">Carrinho vazio.</p>';$('total').textContent=br(cart.reduce((a,x)=>a+Number(products.find(p=>p.id===x.id).price)*x.qty,0))}
+function renderCart() {
+  let total = 0;
+  const lines = cart.map(item => {
+    const product = products.find(p => p.id === item.id);
+    const amount = Number(product.price) * item.qty;
+    total += amount;
+    const row = document.createElement('div');
+    row.className = 'cartline';
+    const name = document.createElement('span');
+    name.textContent = product.name + ' × ' + item.qty;
+    const detail = document.createElement('span');
+    detail.textContent = br(amount) + ' ';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'secondary';
+    remove.style.width = 'auto';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Remover ' + product.name);
+    remove.addEventListener('click', () => del(item.id));
+    detail.append(remove);
+    row.append(name, detail);
+    return row;
+  });
+  const empty = document.createElement('p');
+  empty.className = 'muted';
+  empty.textContent = 'Carrinho vazio.';
+  $('cart').replaceChildren(...(lines.length ? lines : [empty]));
+  $('total').textContent = br(total);
+}
 function del(id){cart=cart.filter(x=>x.id!==id);renderCart()}
 async function checkout(){if(!cart.length)return;try{const s=await call('/sales',{method:'POST',body:JSON.stringify({branch_id:$('branch').value,payment_method:$('pay').value,items:cart.map(x=>({product_id:x.id,qty:x.qty}))})});$('saleMsg').textContent='Venda '+s.id.slice(0,8)+' concluída.';cart=[];await boot()}catch(e){$('saleMsg').textContent='Venda não concluída: '+e.message}}
 async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:$('sku').value,name:$('name').value,barcode:$('barcode').value,price:+$('price').value,cost:+$('cost').value,stock:+$('stock').value,min_stock:+$('min').value})});['sku','name','barcode','price','cost','stock','min'].forEach(id=>$(id).value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}
 async function logout(){try{if(refreshToken)await fetch('/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})})}catch{}token='';refreshToken='';localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');location.href='app.html?mode=login'}
 const qs=new URLSearchParams(location.search),mode=qs.get('mode'),plan=(qs.get('plan')||'PRO').toUpperCase();if(['BASICO','PRO','PREMIUM'].includes(plan))$('regPlan').value=plan;updatePlan();if(mode==='signup')showSignup();else showLogin();if(token)boot();
-async function criarUsuarioTesteMP(){
-  const btn=document.getElementById('mpTestBtn');
-  try{
-    btn.disabled=true;
-    btn.textContent='Criando...';
-
-    const x=await call('/admin/create-mp-test-user');
-
-    alert(
-      'USUÁRIO DE TESTE CRIADO\n\n' +
-      'Email: ' + (x.email||'não retornado') +
-      '\nID: ' + (x.id||'') +
-      '\nUsuário: ' + (x.nickname||'')
-    );
-  }catch(e){
-    alert('Erro ao criar usuário de teste: '+e.message);
-  }finally{
-    btn.disabled=false;
-    btn.textContent='Gerar comprador teste MP';
-  }
-}
-
-const mpTestBtn=document.createElement('button');
-mpTestBtn.id='mpTestBtn';
-mpTestBtn.textContent='Gerar comprador teste MP';
-mpTestBtn.onclick=criarUsuarioTesteMP;
-mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
-document.body.appendChild(mpTestBtn);
-
-
-
- async function verificarMercadoPago(){
-  try{
-    const x=await call('/admin/sync-mp-subscription',{
-      method:'POST'
-    });
-
-    alert(
-      'SINCRONIZAÇÃO MERCADO PAGO\n\n'+
-      'Resultado: '+(x.ok?'OK':'Erro')+
-      '\nPlano: '+(x.plan||'-')+
-      '\nStatus: '+(x.status||'-')+
-      '\nAssinatura: '+(x.subscription_id||'-')
-    );
-
-    if(x.ok){
-      await loadSubscription();
-    }
-
-  }catch(e){
-    alert('Erro na sincronização: '+e.message);
-  }
-} 
-  
-    
-
-  
-    
-  
-  
-
-const mpWhoBtn=document.createElement('button');
-mpWhoBtn.textContent='Verificar Mercado Pago';
-mpWhoBtn.onclick=verificarMercadoPago;
-mpWhoBtn.style.cssText='position:fixed;bottom:85px;right:20px;z-index:9999;padding:14px;background:#2563eb;color:white;border:0;border-radius:10px;font-weight:bold';
-document.body.appendChild(mpWhoBtn);</script></body></html>
+</script></body></html>
