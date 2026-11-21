@@ -292,6 +292,57 @@ app.post('/sales', auth, subscription, async (req, res, next) => {
 });
 app.get('/sales',auth,async(req,res)=>{const q=await db.query(`SELECT s.id,s.total,s.payment_method,s.status,s.created_at,u.name user_name,b.name branch_name FROM sales s JOIN users u ON u.id=s.user_id JOIN branches b ON b.id=s.branch_id WHERE s.tenant_id=$1 ORDER BY s.created_at DESC LIMIT 200`,[req.user.tenant_id]);res.json(q.rows)});
 app.get('/reports/dashboard',auth,async(req,res)=>{const k=(await db.query("SELECT COALESCE(sum(total),0) revenue,count(*) sales,COALESCE(avg(total),0) ticket FROM sales WHERE tenant_id=$1 AND status='COMPLETED' AND created_at>=date_trunc('month',now())",[req.user.tenant_id])).rows[0];const low=(await db.query('SELECT count(*)::int low_stock FROM products WHERE tenant_id=$1 AND active=true AND stock<=min_stock',[req.user.tenant_id])).rows[0];res.json({...k,...low})});
+const inventoryFilters = z.object({
+  q: z.string().trim().max(120).default(''),
+  critical: z.enum(['0', '1']).default('0'),
+  page: z.coerce.number().int().min(1).max(1_000_000).default(1)
+});
+const inventoryPageSize = 25;
+
+app.get('/reports/inventory', auth, async (req, res, next) => {
+  const filters = inventoryFilters.safeParse(req.query);
+  if (!filters.success) return res.status(400).json({ error: filters.error.flatten() });
+
+  const { q, critical, page } = filters.data;
+  try {
+    const { rows } = await db.query(
+      `SELECT id, sku, barcode, name, stock, min_stock, stock <= min_stock AS critical
+       FROM products
+       WHERE tenant_id = $1 AND active
+         AND ($2 = '' OR strpos(lower(name), lower($2)) > 0
+                      OR strpos(lower(sku), lower($2)) > 0
+                      OR strpos(lower(coalesce(barcode, '')), lower($2)) > 0)
+         AND (NOT $3::boolean OR stock <= min_stock)
+       ORDER BY name, sku, id
+       LIMIT $4 OFFSET $5`,
+      [req.user.tenant_id, q, critical === '1', inventoryPageSize + 1, (page - 1) * inventoryPageSize]
+    );
+    res.json({ items: rows.slice(0, inventoryPageSize), has_more: rows.length > inventoryPageSize });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/reports/inventory/:id/movements', auth, async (req, res, next) => {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) return res.status(400).json({ error: 'invalid_product' });
+
+  try {
+    const { rows } = await db.query(
+      `SELECT m.id, m.created_at, m.kind, m.qty, b.name AS branch_name
+       FROM inventory_movements m
+       JOIN branches b ON b.id = m.branch_id AND b.tenant_id = m.tenant_id
+       WHERE m.tenant_id = $1 AND m.product_id = $2
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT 50`,
+      [req.user.tenant_id, id.data]
+    );
+    res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/audit',auth,role('ADMIN'),async(req,res)=>res.json((await db.query('SELECT action,metadata,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.tenant_id])).rows));
 app.use(express.static(__dirname));app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
 app.use((e,req,res,next)=>{console.error(e);res.status(500).json({error:'internal_error'})});
