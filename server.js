@@ -333,7 +333,123 @@ app.get('/master/metrics',auth,role('ADMIN'),async(req,res)=>{if(!process.env.MA
 app.get('/me',auth,async(req,res)=>{const tenant=(await db.query('SELECT id,name,plan,status FROM tenants WHERE id=$1',[req.user.tenant_id])).rows[0];res.json({user:req.user,tenant})});
 app.get('/branches',auth,async(req,res)=>res.json((await db.query('SELECT id,name FROM branches WHERE tenant_id=$1 ORDER BY name',[req.user.tenant_id])).rows));
 app.get('/products',auth,async(req,res)=>res.json((await db.query('SELECT * FROM products WHERE tenant_id=$1 AND active=true ORDER BY name LIMIT 2000',[req.user.tenant_id])).rows));
-app.post('/products',auth,subscription,(req,res,next)=>enforceLimit('products',req,res,next),role('ADMIN','GERENTE'),async(req,res)=>{const S=z.object({sku:z.string().min(1),barcode:z.string().optional(),name:z.string().min(1),price:z.coerce.number().nonnegative(),cost:z.coerce.number().nonnegative().default(0),stock:z.coerce.number().default(0),min_stock:z.coerce.number().default(0)});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});const v=x.data;try{const p=(await db.query('INSERT INTO products(tenant_id,sku,barcode,name,price,cost,stock,min_stock) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[req.user.tenant_id,v.sku,v.barcode||null,v.name,v.price,v.cost,v.stock,v.min_stock])).rows[0];await audit(req.user,'PRODUCT_CREATED',{product_id:p.id,sku:p.sku});res.status(201).json(p)}catch{return res.status(409).json({error:'sku_already_exists'})}});
+const newProduct = z.object({
+  sku: z.string().min(1),
+  barcode: z.string().optional(),
+  name: z.string().min(1),
+  price: z.coerce.number().nonnegative(),
+  cost: z.coerce.number().nonnegative().default(0),
+  stock: z.coerce.number().default(0),
+  min_stock: z.coerce.number().default(0)
+});
+
+const importDecimal = (scale, max) => z.number().finite().min(-max).max(max)
+  .refine(value => value === Math.round(value * scale) / scale, 'Casas decimais acima do limite.');
+
+const importProduct = z.object({
+  sku: z.string().trim().min(1).max(120),
+  barcode: z.string().trim().max(120).optional(),
+  nome: z.string().trim().min(1).max(250),
+  preco: importDecimal(100, 999_999_999_999.99).refine(value => value >= 0),
+  custo: importDecimal(100, 999_999_999_999.99).refine(value => value >= 0).default(0),
+  saldo: importDecimal(1000, 99_999_999_999.999).default(0),
+  min: importDecimal(1000, 99_999_999_999.999).refine(value => value >= 0).default(0)
+}).transform(p => ({
+  sku: p.sku, barcode: p.barcode, name: p.nome, price: p.preco,
+  cost: p.custo, stock: p.saldo, min_stock: p.min
+}));
+
+async function saveNewProducts(tenantId, incoming, skipExisting) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [tenant] } = await client.query(
+      'SELECT plan FROM tenants WHERE id=$1 FOR UPDATE', [tenantId]
+    );
+    const plan = tenant.plan.toUpperCase();
+    const limit = (PLAN_LIMITS[plan] || PLAN_LIMITS.BASICO).products;
+    const existing = (await client.query(
+      'SELECT sku FROM products WHERE tenant_id=$1 AND sku=ANY($2::text[])',
+      [tenantId, incoming.map(product => product.sku)]
+    )).rows;
+    const existingSkus = new Set(existing.map(product => product.sku));
+    const products = incoming.filter(product => !existingSkus.has(product.sku));
+
+    const { rows: [{ count }] } = await client.query(
+      'SELECT count(*)::int AS count FROM products WHERE tenant_id=$1 AND active', [tenantId]
+    );
+    if (products.length > 0 && count + products.length > limit) {
+      await client.query('ROLLBACK');
+      return { error: 'plan_limit_reached', status: 403, resource: 'products', limit, plan };
+    }
+    if (!skipExisting && existing.length > 0) {
+      await client.query('ROLLBACK');
+      return { error: 'sku_already_exists', status: 409 };
+    }
+
+    const inserted = await client.query(
+      `INSERT INTO products(tenant_id,sku,barcode,name,price,cost,stock,min_stock)
+       SELECT $1, sku, nullif(barcode, ''), name, price, cost, stock, min_stock
+       FROM jsonb_to_recordset($2::jsonb) AS p(
+         sku text, barcode text, name text, price numeric, cost numeric, stock numeric, min_stock numeric
+       )
+       RETURNING *`,
+      [tenantId, JSON.stringify(products)]
+    );
+    await client.query('COMMIT');
+    return { rows: inserted.rows, skipped: existing.length };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+app.post('/products', auth, subscription, role('ADMIN', 'GERENTE'), async (req, res, next) => {
+  const input = newProduct.safeParse(req.body);
+  if (!input.success) return res.status(400).json({ error: input.error.flatten() });
+
+  try {
+    const { status, rows, ...result } = await saveNewProducts(req.user.tenant_id, [input.data], false);
+    if (status) return res.status(status).json(result);
+    const [product] = rows;
+    await audit(req.user, 'PRODUCT_CREATED', { product_id: product.id, sku: product.sku });
+    res.status(201).json(product);
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'sku_already_exists' });
+    next(error);
+  }
+});
+
+app.post('/products/import-offline', auth, subscription, role('ADMIN'), async (req, res, next) => {
+  const input = z.object({ produtos: z.array(importProduct).min(1).max(5000) }).safeParse(req.body);
+  if (!input.success) {
+    const issue = input.error.issues[0];
+    return res.status(400).json({
+      error: 'invalid_offline_products',
+      row: Number.isInteger(issue.path[1]) ? issue.path[1] + 1 : undefined,
+      field: issue.path[2]
+    });
+  }
+  const seen = new Set();
+  for (const [index, product] of input.data.produtos.entries()) {
+    if (seen.has(product.sku)) {
+      return res.status(400).json({ error: 'duplicate_import_sku', row: index + 1 });
+    }
+    seen.add(product.sku);
+  }
+
+  try {
+    const { status, rows, skipped, ...result } = await saveNewProducts(req.user.tenant_id, input.data.produtos, true);
+    if (status) return res.status(status).json(result);
+    const summary = { imported: rows.length, skipped };
+    if (rows.length) await audit(req.user, 'OFFLINE_PRODUCTS_IMPORTED', summary);
+    res.status(rows.length ? 201 : 200).json(summary);
+  } catch (error) {
+    next(error);
+  }
+});
 app.patch('/products/:id',auth,role('ADMIN','GERENTE'),async(req,res)=>{const S=z.object({name:z.string().min(1).optional(),price:z.coerce.number().nonnegative().optional(),cost:z.coerce.number().nonnegative().optional(),min_stock:z.coerce.number().nonnegative().optional(),barcode:z.string().nullable().optional()});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});let p=(await db.query(`UPDATE products SET name=COALESCE($1,name),price=COALESCE($2,price),cost=COALESCE($3,cost),min_stock=COALESCE($4,min_stock),barcode=COALESCE($5,barcode) WHERE id=$6 AND tenant_id=$7 RETURNING *`,[x.data.name??null,x.data.price??null,x.data.cost??null,x.data.min_stock??null,x.data.barcode??null,req.params.id,req.user.tenant_id])).rows[0];if(!p)return res.status(404).json({error:'not_found'});await audit(req.user,'PRODUCT_UPDATED',{product_id:p.id});res.json(p)});
 const saleRequest = z.object({
   branch_id: z.string().uuid(),

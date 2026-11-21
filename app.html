@@ -51,6 +51,15 @@
 <section class="card" aria-labelledby="inventoryTitle">
   <h2 id="inventoryTitle">Posição de estoque</h2>
   <p class="muted">Saldo consolidado da empresa. O histórico mostra a filial registrada em cada movimento.</p>
+  <details id="offlineImport" class="hidden" style="margin:12px 0">
+    <summary>Importar produtos da versão offline</summary>
+    <p class="muted">Selecione o backup JSON exportado pelo Estoque IA offline. A importação cadastra produtos e saldos iniciais na empresa atual. SKUs existentes são preservados. Clientes, usuários e vendas ficam no arquivo original.</p>
+    <div class="inventory-filters">
+      <div class="field"><label for="offlineImportFile">Backup JSON</label><input id="offlineImportFile" type="file" accept=".json,application/json"></div>
+      <button id="offlineImportSubmit" type="button" disabled style="width:auto">Importar produtos</button>
+    </div>
+    <p id="offlineImportStatus" class="muted" role="status"></p>
+  </details>
   <form id="inventoryFilters" class="inventory-filters">
     <div class="field"><label for="inventorySearch">Produto, SKU ou EAN</label><input id="inventorySearch" maxlength="120" type="search"></div>
     <label class="inventory-check"><input id="inventoryCritical" type="checkbox"> Somente estoque crítico</label>
@@ -212,6 +221,12 @@ async function initMercadoPago(){
 const billingReady = initMercadoPago();
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function readableError(j,status){
+ if(j?.error==='invalid_offline_products') {
+   const row = j.row ? ' Produto '+j.row+'.' : '';
+   const field = j.field ? ' Campo '+j.field+'.' : '';
+   return 'O backup contém dados inválidos.'+row+field;
+ }
+ if(j?.error==='duplicate_import_sku') return 'SKU repetido no produto '+j.row+'.';
  if(typeof j?.error==='string'){
    const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.',
       billing_not_configured:'A contratação está temporariamente indisponível.',
@@ -300,7 +315,7 @@ async function checkoutPlan(plan){
   await renderPaymentBrick(plan);
   }
 
-async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');isBillingAdmin=me.user.role==='ADMIN';renderProducts();renderCart();loadSubscription();refreshInventory()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
+async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');isBillingAdmin=me.user.role==='ADMIN';$('offlineImport').classList.toggle('hidden',!isBillingAdmin);renderProducts();renderCart();loadSubscription();refreshInventory()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
 const formatStockQuantity = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
 let inventoryPage = 1;
 let inventoryFilters = new URLSearchParams();
@@ -426,9 +441,133 @@ $('inventoryNext').addEventListener('click', () => {
 });
 $('inventoryCloseMovements').addEventListener('click', closeInventoryMovements);
 
-function renderProducts(){const q=($('search').value||'').toLowerCase();$('products').innerHTML=products.filter(p=>(p.name+' '+p.sku+' '+(p.barcode||'')).toLowerCase().includes(q)).map(p=>`<button class="prod" onclick="addCart('${p.id}')"><b>${p.name}</b><br><span class="muted">${p.sku} · estoque ${p.stock}</span><br><strong>${br(p.price)}</strong></button>`).join('')||'<p class="muted">Nenhum produto.</p>'}
+let offlineProducts;
+
+$('offlineImportFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  const status = $('offlineImportStatus');
+  const submit = $('offlineImportSubmit');
+  offlineProducts = undefined;
+  submit.disabled = true;
+  status.textContent = '';
+  if (!file) return;
+  status.textContent = 'Lendo o backup…';
+
+  try {
+    if (file.size > 20 * 1024 * 1024) throw new Error('O arquivo deve ter até 20 MB.');
+    const backup = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+    if ($('offlineImportFile').files[0] !== file) return;
+    if (!Array.isArray(backup?.produtos) || !backup.produtos.length || backup.produtos.length > 5000) {
+      throw new Error('Selecione um backup com 1 a 5.000 produtos.');
+    }
+
+    // Send only product fields. The rest of the offline backup stays on the device.
+    const mapped = backup.produtos.map((p, index) => {
+      const { sku, nome, barcode, preco, custo, saldo, min } = p ?? {};
+      if (typeof sku !== 'string' || typeof nome !== 'string' ||
+          (barcode !== undefined && typeof barcode !== 'string') ||
+          typeof preco !== 'number' ||
+          [custo, saldo, min].some(value => value !== undefined && typeof value !== 'number')) {
+        throw new Error('O backup contém dados inválidos no produto ' + (index + 1) + '.');
+      }
+      return { sku, nome, barcode, preco, custo, saldo, min };
+    });
+    const size = new TextEncoder().encode(JSON.stringify({ produtos: mapped })).byteLength;
+    if (size >= 1024 * 1024) {
+      offlineProducts = undefined;
+      throw new Error('A lista de produtos excede 1 MB.');
+    }
+
+    offlineProducts = mapped;
+    status.textContent = formatStockQuantity.format(mapped.length) +
+      ' produtos no arquivo. Confirme para importar na empresa atual.';
+    submit.disabled = false;
+  } catch (error) {
+    if ($('offlineImportFile').files[0] !== file) return;
+    status.textContent = error instanceof SyntaxError ? 'O arquivo não é um JSON válido.' : error.message;
+  }
+});
+
+$('offlineImportSubmit').addEventListener('click', async () => {
+  if (!offlineProducts) return;
+  const file = $('offlineImportFile');
+  const submit = $('offlineImportSubmit');
+  const status = $('offlineImportStatus');
+  file.disabled = submit.disabled = true;
+  status.textContent = 'Importando produtos…';
+
+  try {
+    const summary = await call('/products/import-offline', {
+      method: 'POST', body: JSON.stringify({ produtos: offlineProducts })
+    });
+    status.textContent = formatStockQuantity.format(summary.imported) + ' cadastrados. ' +
+      formatStockQuantity.format(summary.skipped) + ' SKUs existentes preservados.';
+    offlineProducts = undefined;
+    file.value = '';
+    await boot();
+  } catch (error) {
+    status.textContent = 'Importação não concluída. ' + error.message;
+  } finally {
+    file.disabled = false;
+    submit.disabled = !offlineProducts;
+  }
+});
+
+function renderProducts() {
+  const query = $('search').value.toLowerCase();
+  const matches = products.filter(p =>
+    (p.name + ' ' + p.sku + ' ' + (p.barcode || '')).toLowerCase().includes(query)
+  );
+  const buttons = matches.map(product => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'prod';
+    button.addEventListener('click', () => addCart(product.id));
+    const name = document.createElement('b');
+    name.textContent = product.name;
+    const info = document.createElement('span');
+    info.className = 'muted';
+    info.textContent = product.sku + ' · estoque ' + product.stock;
+    const price = document.createElement('strong');
+    price.textContent = br(product.price);
+    button.append(name, document.createElement('br'), info, document.createElement('br'), price);
+    return button;
+  });
+  const empty = document.createElement('p');
+  empty.className = 'muted';
+  empty.textContent = 'Nenhum produto.';
+  $('products').replaceChildren(...(buttons.length ? buttons : [empty]));
+}
 function addCart(id){const p=products.find(x=>x.id===id),x=cart.find(x=>x.id===id),q=x?x.qty:0;if(q>=Number(p.stock))return alert('Estoque insuficiente');if(x)x.qty++;else cart.push({id,qty:1});renderCart()}
-function renderCart(){$('cart').innerHTML=cart.map(x=>{const p=products.find(y=>y.id===x.id);return `<div class="cartline"><span>${p.name} × ${x.qty}</span><span>${br(Number(p.price)*x.qty)} <button class="secondary" style="width:auto" onclick="del('${x.id}')">×</button></span></div>`}).join('')||'<p class="muted">Carrinho vazio.</p>';$('total').textContent=br(cart.reduce((a,x)=>a+Number(products.find(p=>p.id===x.id).price)*x.qty,0))}
+function renderCart() {
+  let total = 0;
+  const lines = cart.map(item => {
+    const product = products.find(p => p.id === item.id);
+    const amount = Number(product.price) * item.qty;
+    total += amount;
+    const row = document.createElement('div');
+    row.className = 'cartline';
+    const name = document.createElement('span');
+    name.textContent = product.name + ' × ' + item.qty;
+    const detail = document.createElement('span');
+    detail.textContent = br(amount) + ' ';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'secondary';
+    remove.style.width = 'auto';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Remover ' + product.name);
+    remove.addEventListener('click', () => del(item.id));
+    detail.append(remove);
+    row.append(name, detail);
+    return row;
+  });
+  const empty = document.createElement('p');
+  empty.className = 'muted';
+  empty.textContent = 'Carrinho vazio.';
+  $('cart').replaceChildren(...(lines.length ? lines : [empty]));
+  $('total').textContent = br(total);
+}
 function del(id){cart=cart.filter(x=>x.id!==id);renderCart()}
 async function checkout(){if(!cart.length)return;try{const s=await call('/sales',{method:'POST',body:JSON.stringify({branch_id:$('branch').value,payment_method:$('pay').value,items:cart.map(x=>({product_id:x.id,qty:x.qty}))})});$('saleMsg').textContent='Venda '+s.id.slice(0,8)+' concluída.';cart=[];await boot()}catch(e){$('saleMsg').textContent='Venda não concluída: '+e.message}}
 async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:$('sku').value,name:$('name').value,barcode:$('barcode').value,price:+$('price').value,cost:+$('cost').value,stock:+$('stock').value,min_stock:+$('min').value})});['sku','name','barcode','price','cost','stock','min'].forEach(id=>$(id).value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}

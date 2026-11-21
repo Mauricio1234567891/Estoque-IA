@@ -17,3 +17,7 @@ Use `MP_TEST_MODE=true` e credenciais e IDs de planos de teste em uma implantaç
 Antes de ativar a contratação em produção, confirme no ambiente de teste que um pagamento aprovado ativa o plano, uma renovação confirmada estende o acesso apenas uma vez, um pagamento recusado não estende o prazo e o cancelamento confirmado atualiza o app. Confira também cadastro, login, uma venda e o respectivo estorno. Depois, publique com as credenciais de produção e verifique `/health`.
 
 Se uma contratação ficar aguardando confirmação após uma falha de rede, procure no Mercado Pago a referência externa formada pelo ID da empresa e pelo `billing_checkout_id`, unidos por dois-pontos. A notificação do Mercado Pago pode concluir a vinculação. Só limpe a reserva depois de confirmar com o provedor que a tentativa não criou assinatura. Uma tentativa em aberto impede nova cobrança para a mesma empresa.
+
+## Produtos da versão offline
+
+No Estoque IA offline, use **Exportar backup** para gerar o JSON. No sistema web, entre como administrador, abra **Posição de estoque → Importar produtos da versão offline** e selecione o arquivo. Confira a quantidade de produtos e confirme na empresa de destino. A importação repõe o cadastro e o saldo inicial de SKUs ausentes, sem sobrescrever SKUs existentes. Dados de clientes, usuários, filiais e vendas permanecem no backup completo.
