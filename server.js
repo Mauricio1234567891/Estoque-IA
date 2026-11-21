@@ -9,9 +9,13 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
+if (process.env.NODE_ENV === 'production' &&
+    (!process.env.DATABASE_URL || !process.env.JWT_SECRET)) {
+  throw new Error('DATABASE_URL and JWT_SECRET are required in production.');
+}
 const {Pool}=pg; const db=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:undefined}); const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
-async function migrate(){await db.query('CREATE TABLE IF NOT EXISTS schema_migrations(filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');for(const f of ['001_init.sql','002_v11.sql','003_v12.sql']){const done=(await db.query('SELECT 1 FROM schema_migrations WHERE filename=$1',[f])).rowCount;if(done)continue;const sql=fs.readFileSync(path.join(__dirname,f),'utf8');const c=await db.connect();try{await c.query('BEGIN');await c.query(sql);await c.query('INSERT INTO schema_migrations(filename) VALUES($1)',[f]);await c.query('COMMIT')}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}}
+async function migrate(){await db.query('CREATE TABLE IF NOT EXISTS schema_migrations(filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');for(const f of ['001_init.sql','002_v11.sql','003_v12.sql','004_billing_sync.sql']){const done=(await db.query('SELECT 1 FROM schema_migrations WHERE filename=$1',[f])).rowCount;if(done)continue;const sql=fs.readFileSync(path.join(__dirname,f),'utf8');const c=await db.connect();try{await c.query('BEGIN');await c.query(sql);await c.query('INSERT INTO schema_migrations(filename) VALUES($1)',[f]);await c.query('COMMIT')}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}}
 await migrate();
 app.use(cors({origin:process.env.CORS_ORIGIN?.split(',')||true})); app.use(express.json({limit:'1mb'}));
 const secret=process.env.JWT_SECRET||'DEV_ONLY_CHANGE_ME';
@@ -24,7 +28,14 @@ const audit=(u,a,m={})=>db.query('INSERT INTO audit_logs(tenant_id,user_id,actio
 const PLAN_LIMITS={BASICO:{products:500,users:2,branches:1},PRO:{products:5000,users:10,branches:5},PREMIUM:{products:50000,users:50,branches:30}};
 async function subscription(req,res,next){const t=(await db.query('SELECT plan,status,trial_ends_at,current_period_end FROM tenants WHERE id=$1',[req.user.tenant_id])).rows[0];if(!t)return res.status(403).json({error:'tenant_not_found'});const ok=['ACTIVE','TRIAL'].includes(t.status)&&(!t.current_period_end||new Date(t.current_period_end)>new Date())&&(!t.trial_ends_at||t.status!=='TRIAL'||new Date(t.trial_ends_at)>new Date());if(!ok)return res.status(402).json({error:'subscription_required',status:t.status});req.subscription=t;next()}
 async function enforceLimit(kind,req,res,next){const plan=(req.subscription?.plan||'BASICO').toUpperCase();const lim=(PLAN_LIMITS[plan]||PLAN_LIMITS.BASICO)[kind];const table={products:'products',users:'users',branches:'branches'}[kind];const n=Number((await db.query(`SELECT count(*) n FROM ${table} WHERE tenant_id=$1${kind==='products'?" AND active=true":kind==='users'?" AND active=true":''}`,[req.user.tenant_id])).rows[0].n);if(n>=lim)return res.status(403).json({error:'plan_limit_reached',resource:kind,limit:lim,plan});next()}
-app.get('/health',(req,res)=>res.json({ok:true,version:'14.0.0',database:'postgresql'}));
+app.get('/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.json({ ok: true, version: '14.0.0', database: 'postgresql' });
+  } catch {
+    res.status(503).json({ ok: false, error: 'database_unavailable' });
+  }
+});
 app.post('/auth/register',async(req,res)=>{const S=z.object({company:z.string().min(2),name:z.string().min(2),email:z.string().email(),password:z.string().min(8),plan:z.enum(['BASICO','PRO','PREMIUM']).default('PRO')});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});const c=await db.connect();try{await c.query('BEGIN');const t=(await c.query("INSERT INTO tenants(name,plan,status,trial_ends_at) VALUES($1,$2,'TRIAL',now()+interval '14 days') RETURNING *",[x.data.company,x.data.plan])).rows[0];const b=(await c.query("INSERT INTO branches(tenant_id,name) VALUES($1,'Matriz') RETURNING *",[t.id])).rows[0];const hash=await bcrypt.hash(x.data.password,12);const u=(await c.query("INSERT INTO users(tenant_id,name,email,password_hash,role) VALUES($1,$2,$3,$4,'ADMIN') RETURNING id,tenant_id,name,email,role",[t.id,x.data.name,x.data.email.toLowerCase(),hash])).rows[0];await c.query('COMMIT');res.status(201).json({...(await issueSession(u)),user:u,tenant:t,branch:b})}catch(e){await c.query('ROLLBACK');res.status(409).json({error:'registration_failed'})}finally{c.release()}});
 app.post('/auth/login',async(req,res)=>{const {email,password}=req.body||{};const u=(await db.query('SELECT * FROM users WHERE lower(email)=lower($1) AND active=true LIMIT 1',[email])).rows[0];if(!u||!await bcrypt.compare(password||'',u.password_hash))return res.status(401).json({error:'invalid_credentials'});await audit(u,'LOGIN');res.json({...(await issueSession(u)),user:{id:u.id,tenant_id:u.tenant_id,name:u.name,email:u.email,role:u.role}})});
 
@@ -46,150 +57,277 @@ app.post('/sales/:id/cancel',auth,role('ADMIN','GERENTE'),async(req,res)=>{const
 
 const PUBLIC_PLANS={BASICO:{name:'Básico',amount:49.90,limits:PLAN_LIMITS.BASICO},PRO:{name:'PRO',amount:99.90,limits:PLAN_LIMITS.PRO},PREMIUM:{name:'Premium',amount:199.90,limits:PLAN_LIMITS.PREMIUM}};
 app.get('/billing/plans',(req,res)=>res.json(PUBLIC_PLANS));
-app.get('/billing/config',(req,res)=>res.json({public_key:process.env.MP_PUBLIC_KEY||null}));
-app.get('/billing/subscription',auth,async(req,res)=>{const t=(await db.query('SELECT plan,status,trial_ends_at,current_period_end,billing_provider,provider_subscription_id FROM tenants WHERE id=$1',[req.user.tenant_id])).rows[0];res.json({...t,limits:PLAN_LIMITS[(t.plan||'BASICO').toUpperCase()]||PLAN_LIMITS.BASICO})});
-app.post('/billing/checkout',auth,role('ADMIN'),async(req,res)=>{
-  const plan=String(req.body?.plan||'').toUpperCase();
-  const cardTokenId=String(req.body?.card_token_id||'');
+const mpProvider = 'MERCADO_PAGO';
+const mpPlans = {
+  BASICO: process.env.MP_PLAN_BASICO_ID,
+  PRO: process.env.MP_PLAN_PRO_ID,
+  PREMIUM: process.env.MP_PLAN_PREMIUM_ID
+};
+const mpEnabled = process.env.MP_CHECKOUT_ENABLED === 'true' &&
+  Boolean(process.env.MP_ACCESS_TOKEN && process.env.MP_PUBLIC_KEY &&
+    process.env.MP_WEBHOOK_SECRET && Object.values(mpPlans).some(Boolean));
 
-  const planIds={
-    BASICO:process.env.MP_PLAN_BASICO_ID,
-    PRO:process.env.MP_PLAN_PRO_ID,
-    PREMIUM:process.env.MP_PLAN_PREMIUM_ID
-  };
-
-  if(!PUBLIC_PLANS[plan]){
-    return res.status(400).json({error:'invalid_plan'});
+class MercadoPagoError extends Error {
+  constructor(status) {
+    super('mercado_pago_request_failed');
+    this.status = status;
   }
-
-  if(!cardTokenId){
-    return res.status(400).json({error:'card_token_required'});
-  }
-
-  const preapprovalPlanId=planIds[plan];
-
-  if(!preapprovalPlanId){
-    return res.status(503).json({error:'plan_not_configured'});
-  }
-
-  if(!process.env.MP_ACCESS_TOKEN){
-    return res.status(503).json({error:'billing_not_configured'});
-  }
-
-  try{
-    const user=(await db.query(
-      'SELECT email FROM users WHERE id=$1',
-      [req.user.sub]
-    )).rows[0];
-
-    const payerEmail=process.env.MP_TEST_PAYER_EMAIL||user?.email;
-
-    if(!payerEmail){
-      return res.status(400).json({error:'payer_email_required'});
-    }
-
-    const body={
-      preapproval_plan_id:preapprovalPlanId,
-      external_reference:String(req.user.tenant_id),
-      payer_email:payerEmail,
-      card_token_id:cardTokenId,
-      status:'authorized'
-    };
-
-    const r=await fetch(
-      'https://api.mercadopago.com/preapproval',
-      {
-        method:'POST',
-        headers:{
-          Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
-          'Content-Type':'application/json'
-        },
-        body:JSON.stringify(body)
-      }
-    );
-
-    const data=await r.json();
-
-    if(!r.ok){
-  console.error('[MercadoPago subscription]',{
-    http_status:r.status,
-    error:data?.error||null,
-    message:data?.message||null,
-    status:data?.status||null,
-    status_detail:data?.status_detail||null,
-    cause:Array.isArray(data?.cause)
-      ? data.cause.map(c=>({
-          code:c?.code||null,
-          description:c?.description||null
-        }))
-      : null,
-    diagnostic:{
-      plan:plan,
-      preapproval_plan_id:preapprovalPlanId,
-      payer_source:process.env.MP_TEST_PAYER_EMAIL
-        ? 'MP_TEST_PAYER_EMAIL'
-        : 'user.email',
-      has_card_token:Boolean(cardTokenId),
-      external_reference:String(req.user.tenant_id)
-    }
-  });
-
-  return res.status(502).json({
-    error:'billing_provider_error',
-    message:data?.message||data?.error||'provider_error',
-    provider_status:r.status,
-    provider_error:data?.error||null,
-    provider_status_detail:data?.status_detail||null,
-    provider_cause:Array.isArray(data?.cause)
-      ? data.cause.map(c=>({
-          code:c?.code||null,
-          description:c?.description||null
-        }))
-      : null
-  });
 }
 
-    await db.query(
-      `UPDATE tenants
-       SET plan=$1,
-           status='PENDING',
-           billing_provider='MERCADO_PAGO',
-           provider_subscription_id=$2
-       WHERE id=$3`,
-      [plan,data.id,req.user.tenant_id]
+async function mpRequest(endpoint, method = 'GET', body) {
+  const response = await fetch('https://api.mercadopago.com' + endpoint, {
+    method,
+    headers: {
+      Authorization: 'Bearer ' + process.env.MP_ACCESS_TOKEN,
+      'Content-Type': 'application/json',
+      ...(process.env.MP_TEST_MODE === 'true' ? { 'X-scope': 'stage' } : {})
+    },
+    body: body && JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw new MercadoPagoError(response.status);
+  return response.json();
+}
+
+const mpSubscriptionPath = id => '/preapproval/' + encodeURIComponent(id);
+const mpDate = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
+  ? new Date(value) : null;
+const mpStatus = new Map([
+  ['pending', 'PENDING'], ['authorized', 'PENDING'], ['paused', 'PAST_DUE'],
+  ['cancelled', 'CANCELLED'], ['canceled', 'CANCELLED']
+]);
+
+async function syncMpSubscription(data) {
+  const [tenantId, checkoutId, ...extra] = String(data.external_reference ?? '').split(':');
+  if (!z.string().uuid().safeParse(tenantId).success || extra.length ||
+    typeof data.id !== 'string' || !data.id || !mpStatus.has(data.status)) return null;
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [tenant] } = await client.query(
+      'SELECT * FROM tenants WHERE id=$1 FOR UPDATE', [tenantId]
     );
+    const linked = tenant?.billing_provider === mpProvider && tenant.provider_subscription_id === data.id;
+    const reserved = Boolean(tenant?.billing_checkout_id && tenant.billing_checkout_id === checkoutId);
+    if (linked && tenant.billing_checkout_id && !reserved) {
+      await client.query('COMMIT');
+      return tenant;
+    }
+    const plan = reserved ? tenant.billing_checkout_plan : tenant?.plan;
+    if ((!linked && !reserved) || !mpPlans[plan] || mpPlans[plan] !== data.preapproval_plan_id) {
+      await client.query('COMMIT');
+      return null;
+    }
+    const modified = mpDate(data.last_modified);
+    if (linked && tenant.billing_provider_modified_at &&
+        (!modified || modified < tenant.billing_provider_modified_at ||
+          (tenant.status === 'CANCELLED' && mpStatus.get(data.status) !== 'CANCELLED'))) {
+      await client.query('COMMIT');
+      return tenant;
+    }
 
-    await db.query(
-      `INSERT INTO billing_events
-       (tenant_id,provider,event_type,provider_event_id,payload)
-       VALUES($1,$2,$3,$4,$5)
-       ON CONFLICT DO NOTHING`,
-      [
-        req.user.tenant_id,
-        'MERCADO_PAGO',
-        'subscription_created',
-        data.id,
-        data
-      ]
+    const charge = mpDate(data.summarized?.last_charged_date);
+    const nextPayment = mpDate(data.next_payment_date);
+    let paidThrough = linked ? tenant.current_period_end : null;
+    let lastCharge = linked ? tenant.billing_last_charge_at : null;
+    let status = mpStatus.get(data.status);
+    if (data.status === 'authorized') {
+      if (Number(data.summarized?.charged_quantity) > 0 && charge && nextPayment &&
+          nextPayment > charge && (!lastCharge || charge > lastCharge)) {
+        paidThrough = nextPayment;
+        lastCharge = charge;
+      }
+      if (paidThrough && paidThrough > new Date()) status = 'ACTIVE';
+      else if (paidThrough) status = 'PAST_DUE';
+    }
+
+    const result = await client.query(
+      `UPDATE tenants SET plan=$2, status=$3, billing_provider=$4, provider_subscription_id=$5,
+        current_period_end=$6, billing_last_charge_at=$7, billing_provider_modified_at=$8,
+        billing_checkout_id=NULL, billing_checkout_plan=NULL
+       WHERE id=$1 RETURNING plan, status, current_period_end, provider_subscription_id`,
+      [tenantId, plan, status, mpProvider, data.id, paidThrough, lastCharge, modified]
     );
-
-    return res.json({
-      mode:'mercado_pago',
-      subscription_id:data.id,
-      status:data.status,
-      external_reference:data.external_reference||null
-    });
-
-  }catch(e){
-    console.error('[Billing checkout error]',e);
-
-    return res.status(502).json({
-      error:'billing_provider_error',
-      message:e?.message||'provider_error'
-    });
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-});app.post('/billing/cancel',auth,role('ADMIN'),async(req,res)=>{const t=(await db.query('SELECT provider_subscription_id,billing_provider FROM tenants WHERE id=$1',[req.user.tenant_id])).rows[0];if(t?.billing_provider==='MERCADO_PAGO'&&t.provider_subscription_id&&process.env.MP_ACCESS_TOKEN){await fetch(`https://api.mercadopago.com/preapproval/${t.provider_subscription_id}`,{method:'PUT',headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify({status:'cancelled'})})}await db.query("UPDATE tenants SET status='CANCELLED' WHERE id=$1",[req.user.tenant_id]);await audit(req.user,'SUBSCRIPTION_CANCELLED');res.json({ok:true})});
-app.post('/webhooks/mercadopago',async(req,res)=>{const eventId=String(req.query?.['data.id']||req.query?.data_id||req.body?.data?.id||req.body?.id||'');const type=String(req.body?.type||req.body?.topic||'unknown');if(!eventId)return res.status(200).json({ok:true});if(!process.env.MP_WEBHOOK_SECRET)return res.status(503).json({error:'webhook_not_configured'});const xSignature=String(req.headers['x-signature']||'');const xRequestId=String(req.headers['x-request-id']||'');const parts=Object.fromEntries(xSignature.split(',').map(p=>p.trim().split('=',2)).filter(x=>x.length===2));const ts=parts.ts||'',v1=parts.v1||'';const dataId=eventId.toLowerCase();const manifest=`id:${dataId};request-id:${xRequestId};ts:${ts};`;const expected=crypto.createHmac('sha256',process.env.MP_WEBHOOK_SECRET).update(manifest).digest('hex');const valid=v1.length===expected.length&&crypto.timingSafeEqual(Buffer.from(v1),Buffer.from(expected));if(!xSignature||!xRequestId||!ts||!v1||!valid)return res.status(401).json({error:'invalid_webhook_signature'});const ins=await db.query("INSERT INTO billing_events(provider,event_type,provider_event_id,payload) VALUES('MERCADO_PAGO',$1,$2,$3) ON CONFLICT(provider,provider_event_id,event_type) DO NOTHING RETURNING id",[type,eventId,req.body]);if(!ins.rowCount)return res.json({ok:true,duplicate:true});try{if(type.includes('subscription_preapproval')&&process.env.MP_ACCESS_TOKEN){const r=await fetch(`https://api.mercadopago.com/preapproval/${eventId}`,{headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`}});const d=await r.json();const tenantId=d.external_reference;const map={authorized:'ACTIVE',paused:'PAST_DUE',cancelled:'CANCELLED',pending:'PENDING'};if(tenantId)await db.query("UPDATE tenants SET status=$1,provider_subscription_id=$2,current_period_end=CASE WHEN $1='ACTIVE' THEN now()+interval '30 days' ELSE current_period_end END WHERE id=$3",[map[d.status]||'PENDING',d.id,tenantId])}await db.query('UPDATE billing_events SET processed_at=now() WHERE provider=$1 AND provider_event_id=$2 AND event_type=$3',['MERCADO_PAGO',eventId,type]);res.json({ok:true})}catch(e){res.status(500).json({error:'webhook_processing_failed'})}});
+}
+
+app.get('/billing/config', (req, res) => {
+  res.json({ public_key: mpEnabled ? process.env.MP_PUBLIC_KEY : null, enabled: mpEnabled });
+});
+
+app.get('/billing/subscription', auth, async (req, res, next) => {
+  try {
+    const { rows: [tenant] } = await db.query(
+      `SELECT plan, status, trial_ends_at, current_period_end, billing_provider,
+        provider_subscription_id, billing_checkout_id IS NOT NULL AS checkout_in_progress,
+        provider_subscription_id IS NULL OR
+          (status='CANCELLED' AND billing_provider_modified_at IS NOT NULL) AS can_checkout
+       FROM tenants WHERE id=$1`, [req.user.tenant_id]
+    );
+    if (!tenant) return res.status(404).json({ error: 'tenant_not_found' });
+    res.json({ ...tenant, limits: PLAN_LIMITS[tenant.plan] ?? PLAN_LIMITS.BASICO });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/billing/checkout', auth, role('ADMIN'), async (req, res, next) => {
+  if (!mpEnabled) return res.status(503).json({ error: 'billing_not_configured' });
+  const input = z.object({
+    plan: z.enum(['BASICO', 'PRO', 'PREMIUM']),
+    card_token_id: z.string().min(1).max(512)
+  }).safeParse(req.body);
+  if (!input.success) return res.status(400).json({ error: input.error.flatten() });
+
+  const { plan, card_token_id } = input.data;
+  if (!mpPlans[plan]) return res.status(503).json({ error: 'plan_not_configured' });
+
+  const { tenant_id, sub: userId } = req.user;
+  const attempt = crypto.randomUUID();
+  let payerEmail;
+  try {
+    const { rows: [user] } = await db.query(
+      'SELECT email FROM users WHERE id=$1 AND tenant_id=$2 AND active AND role=\'ADMIN\'',
+      [userId, tenant_id]
+    );
+    if (!user) return res.status(403).json({ error: 'forbidden' });
+    payerEmail = process.env.MP_TEST_MODE === 'true' && process.env.MP_TEST_PAYER_EMAIL
+      ? process.env.MP_TEST_PAYER_EMAIL : user.email;
+
+    const reservation = await db.query(
+      `UPDATE tenants SET billing_checkout_id=$2, billing_checkout_plan=$3
+       WHERE id=$1 AND billing_checkout_id IS NULL
+         AND (provider_subscription_id IS NULL OR
+           (status='CANCELLED' AND billing_provider_modified_at IS NOT NULL))
+       RETURNING id`,
+      [tenant_id, attempt, plan]
+    );
+    if (!reservation.rowCount) return res.status(409).json({ error: 'subscription_already_exists' });
+  } catch (error) {
+    return next(error);
+  }
+
+  try {
+    const data = await mpRequest('/preapproval', 'POST', {
+      preapproval_plan_id: mpPlans[plan],
+      external_reference: tenant_id + ':' + attempt,
+      payer_email: payerEmail,
+      card_token_id,
+      status: 'authorized'
+    });
+    const subscription = await syncMpSubscription(data);
+    if (!subscription) return res.status(502).json({ error: 'subscription_confirmation_pending' });
+    res.json({ mode: 'mercado_pago', subscription_id: data.id, status: subscription.status });
+  } catch (error) {
+    if (!(error instanceof MercadoPagoError) || ![400, 401, 403, 422].includes(error.status)) {
+      return res.status(502).json({ error: 'subscription_confirmation_pending' });
+    }
+    try {
+      await db.query(
+        'UPDATE tenants SET billing_checkout_id=NULL, billing_checkout_plan=NULL WHERE id=$1 AND billing_checkout_id=$2',
+        [tenant_id, attempt]
+      );
+      res.status(502).json({ error: 'billing_provider_error' });
+    } catch (dbError) {
+      next(dbError);
+    }
+  }
+});
+
+async function billingSubscriptionId(tenantId) {
+  const { rows: [tenant] } = await db.query(
+    'SELECT provider_subscription_id FROM tenants WHERE id=$1 AND billing_provider=$2',
+    [tenantId, mpProvider]
+  );
+  return tenant?.provider_subscription_id;
+}
+
+const billingUpdate = cancel => async (req, res, next) => {
+  if (!process.env.MP_ACCESS_TOKEN) return res.status(503).json({ error: 'billing_not_configured' });
+  try {
+    const id = await billingSubscriptionId(req.user.tenant_id);
+    if (!id) return res.status(404).json({ error: 'subscription_not_found' });
+    const endpoint = mpSubscriptionPath(id);
+    const data = await mpRequest(endpoint);
+    if (data.id !== id || String(data.external_reference ?? '').split(':')[0] !== req.user.tenant_id) {
+      return res.status(409).json({ error: 'subscription_validation_failed' });
+    }
+
+    let confirmed = data;
+    if (cancel && mpStatus.get(data.status) !== 'CANCELLED') {
+      confirmed = await mpRequest(endpoint, 'PUT', { status: 'canceled' });
+    }
+    if (confirmed.id !== id ||
+        String(confirmed.external_reference ?? '').split(':')[0] !== req.user.tenant_id ||
+        (cancel && mpStatus.get(confirmed.status) !== 'CANCELLED')) {
+      return res.status(502).json({ error: 'subscription_confirmation_pending' });
+    }
+    const subscription = await syncMpSubscription(confirmed);
+    if (!subscription || (cancel && subscription.status !== 'CANCELLED')) {
+      return res.status(409).json({ error: 'subscription_validation_failed' });
+    }
+    res.json({ ok: true, plan: subscription.plan, status: subscription.status });
+  } catch (error) {
+    if (error instanceof MercadoPagoError || error instanceof TypeError || error.name === 'TimeoutError') {
+      return res.status(502).json({ error: 'billing_provider_error' });
+    }
+    next(error);
+  }
+};
+
+app.post('/billing/sync', auth, role('ADMIN'), billingUpdate(false));
+app.post('/billing/cancel', auth, role('ADMIN'), billingUpdate(true));
+
+app.post('/webhooks/mercadopago', async (req, res) => {
+  const id = req.query['data.id'];
+  const type = req.body?.type;
+  if (!['subscription_preapproval', 'subscription_authorized_payment'].includes(type)) return res.sendStatus(200);
+  if (!process.env.MP_WEBHOOK_SECRET || !process.env.MP_ACCESS_TOKEN) return res.sendStatus(503);
+
+  const requestId = req.get('x-request-id');
+  const signature = new Map((req.get('x-signature') ?? '').split(',').map(part => part.trim().split('=')));
+  const timestamp = signature.get('ts');
+  const digest = signature.get('v1');
+  if (typeof id !== 'string' || !/^[\da-z-]{1,128}$/i.test(id) || !requestId ||
+      !/^\d{1,16}$/.test(timestamp ?? '') || !/^[a-f\d]{64}$/i.test(digest ?? '')) {
+    return res.sendStatus(401);
+  }
+  const manifest = `id:${id.toLowerCase()};request-id:${requestId};ts:${timestamp};`;
+  const expected = crypto.createHmac('sha256', process.env.MP_WEBHOOK_SECRET).update(manifest).digest();
+  if (!crypto.timingSafeEqual(Buffer.from(digest, 'hex'), expected)) return res.sendStatus(401);
+
+  try {
+    const invoice = type === 'subscription_authorized_payment'
+      ? await mpRequest('/authorized_payments/' + encodeURIComponent(id)) : null;
+    if (invoice && (String(invoice.id) !== id || typeof invoice.preapproval_id !== 'string')) {
+      return res.sendStatus(502);
+    }
+
+    const subscriptionId = invoice?.preapproval_id ?? id;
+    const data = await mpRequest(mpSubscriptionPath(subscriptionId));
+    if (data.id !== subscriptionId) return res.sendStatus(502);
+    const lastCharge = mpDate(data.summarized?.last_charged_date);
+    const debitDate = mpDate(invoice?.debit_date);
+    if (invoice?.payment?.status === 'approved' && debitDate &&
+        (!lastCharge || lastCharge < debitDate)) {
+      return res.sendStatus(503);
+    }
+    await syncMpSubscription(data);
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[Mercado Pago webhook]', error instanceof MercadoPagoError ? error.status : error.name);
+    res.sendStatus(503);
+  }
+});
+
 app.get('/master/metrics',auth,role('ADMIN'),async(req,res)=>{if(!process.env.MASTER_TENANT_ID||req.user.tenant_id!==process.env.MASTER_TENANT_ID)return res.status(403).json({error:'master_only'});const x=(await db.query(`SELECT count(*)::int tenants,count(*) FILTER(WHERE status='ACTIVE')::int active,count(*) FILTER(WHERE status='TRIAL')::int trials,count(*) FILTER(WHERE status IN ('PAST_DUE','CANCELLED'))::int at_risk,COALESCE(sum(CASE plan WHEN 'BASICO' THEN 49.9 WHEN 'PRO' THEN 99.9 WHEN 'PREMIUM' THEN 199.9 ELSE 0 END) FILTER(WHERE status='ACTIVE'),0) mrr FROM tenants`)).rows[0];res.json(x)});
 
 app.get('/me',auth,async(req,res)=>{const tenant=(await db.query('SELECT id,name,plan,status FROM tenants WHERE id=$1',[req.user.tenant_id])).rows[0];res.json({user:req.user,tenant})});
@@ -344,431 +482,12 @@ app.get('/reports/inventory/:id/movements', auth, async (req, res, next) => {
 });
 
 app.get('/audit',auth,role('ADMIN'),async(req,res)=>res.json((await db.query('SELECT action,metadata,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.tenant_id])).rows));
-app.use(express.static(__dirname));app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
+app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/app.html', (req, res) => res.sendFile(path.join(__dirname, 'app.html')));
+app.use((error, req, res, next) => {
+  console.error(error.name);
+  if (res.headersSent) return next(error);
+  res.status(error.status === 400 ? 400 : 500).json({ error: 'request_failed' });
+});
 app.use((e,req,res,next)=>{console.error(e);res.status(500).json({error:'internal_error'})});
-app.get('/admin/mp-whoami', auth, role('ADMIN'), async (req,res)=>{
-  try{
-    const r=await fetch('https://api.mercadopago.com/users/me',{
-      headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`}
-    });
-    const data=await r.json();
-
-    console.log('[MP whoami]',{
-      http_status:r.status,
-      id:data?.id||null,
-      nickname:data?.nickname||null,
-      site_id:data?.site_id||null
-    });
-
-    res.status(r.status).json({
-      http_status:r.status,
-      id:data?.id||null,
-      nickname:data?.nickname||null,
-      site_id:data?.site_id||null,
-      error:data?.error||null,
-      message:data?.message||null
-    });
-  }catch(e){
-    res.status(500).json({error:'mp_whoami_failed'});
-  }
-});
-app.get('/admin/create-mp-test-user', auth, role('ADMIN'), async (req, res) => {
-  try {
-    if (!process.env.MP_ACCESS_TOKEN) {
-      return res.status(503).json({
-        error: 'MP_ACCESS_TOKEN_not_configured'
-      });
-    }
-
-    const r = await fetch('https://api.mercadopago.com/users/test', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        site_id: 'MLB',
-        description: 'Buyer Estoque IA'
-      })
-    });
-
-    const data = await r.json();
-
-    if (!r.ok) {
-      console.error('[MP create test user]', { http_status: r.status, error: data?.error || null, message: data?.message || null, cause: data?.cause || null });
-      return res.status(r.status).json({
-        error: data?.error || 'mercadopago_error',
-        message: data?.message || null
-      });
-    }
-
-    return res.json({
-      id: data.id,
-      nickname: data.nickname,
-      email: data.email,
-      site_status: data.site_status
-    });
-
-  } catch (e) {
-    console.error('[MP test user]', e?.message);
-    return res.status(500).json({
-      error: 'test_user_creation_failed'
-    });
-  }
-});
-app.get('/admin/test-mp-plan',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const body={
-      reason:'Estoque IA PRO TESTE',
-      auto_recurring:{
-        frequency:1,
-        frequency_type:'months',
-        transaction_amount:99.90,
-        currency_id:'BRL'
-      },
-      back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com'
-    };
-
-    const r=await fetch('https://api.mercadopago.com/preapproval_plan',{
-      method:'POST',
-      headers:{
-        Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify(body)
-    });
-
-    const data=await r.json();
-
-    console.log('[MP plan test]',{
-      http_status:r.status,
-      id:data?.id||null,
-      status:data?.status||null,
-      message:data?.message||null
-    });
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      id:data?.id||null,
-      status:data?.status||null,
-      init_point:data?.init_point||null,
-      error:data?.error||null,
-      message:data?.message||null
-    });
-  }catch(e){
-    console.error('[MP plan test error]',e?.message);
-    return res.status(500).json({
-      error:'mp_plan_test_failed'
-    });
-  }
-});
-app.get('/admin/test-mp-subscriptions',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const r=await fetch('https://api.mercadopago.com/preapproval/search?status=authorized',{
-      headers:{Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`}
-    });
-    const data=await r.json();
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      results:(data.results||[]).map(x=>({
-        id:x.id,
-        status:x.status,
-        reason:x.reason,
-        preapproval_plan_id:x.preapproval_plan_id,
-        external_reference:x.external_reference,
-        payer_id:x.payer_id,
-        next_payment_date:x.next_payment_date
-      }))
-    });
-  }catch(e){
-    return res.status(500).json({
-      error:'mp_subscription_search_failed'
-    });
-  }
-});
-app.put('/admin/test-mp-link/:id',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const tenantId=String(req.user.tenant_id);
-
-    const r=await fetch(`https://api.mercadopago.com/preapproval/${req.params.id}`,{
-      method:'PUT',
-      headers:{
-        Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({
-        external_reference:tenantId
-      })
-    });
-
-    const data=await r.json();
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      id:data?.id||null,
-      status:data?.status||null,
-      preapproval_plan_id:data?.preapproval_plan_id||null,
-      external_reference:data?.external_reference||null,
-      next_payment_date:data?.next_payment_date||null,
-      error:data?.error||null,
-      message:data?.message||null
-    });
-  }catch(e){
-    return res.status(500).json({
-      error:'mp_subscription_link_failed'
-    });
-  }
-});
-app.post('/admin/test-pro-checkout-v2',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const tenantId=String(req.user.tenant_id);
-
-    const email=(await db.query(
-      'SELECT email FROM users WHERE id=$1',
-      [req.user.sub]
-    )).rows[0]?.email;
-
-    const payerEmail=process.env.MP_TEST_PAYER_EMAIL||email;
-
-    const body={
-      preapproval_plan_id:'5822c3013f85418fa0f55728f6804b5d',
-      reason:'Estoque IA PRO',
-      external_reference:tenantId,
-      payer_email:payerEmail,
-      back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com',
-      status:'pending'
-    };
-
-    const r=await fetch('https://api.mercadopago.com/preapproval',{
-      method:'POST',
-      headers:{
-        Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify(body)
-    });
-
-    const data=await r.json();
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      id:data?.id||null,
-      status:data?.status||null,
-      external_reference:data?.external_reference||null,
-      preapproval_plan_id:data?.preapproval_plan_id||null,
-      init_point:data?.init_point||null,
-      error:data?.error||null,
-      message:data?.message||null
-    });
-
-  }catch(e){
-    return res.status(500).json({
-      error:'mp_pro_checkout_v2_failed',
-      message:e?.message||null
-    });
-  }
-});
-app.get('/admin/test-pro-plan-checkout',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const planId='5822c3013f85418fa0f55728f6804b5d';
-
-    const r=await fetch(
-      `https://api.mercadopago.com/preapproval_plan/${planId}`,
-      {
-        headers:{
-          Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
-      }
-    );
-
-    const data=await r.json();
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      plan_id:data?.id||null,
-      status:data?.status||null,
-      init_point:data?.init_point||null,
-      message:data?.message||null
-    });
-
-  }catch(e){
-    return res.status(500).json({
-      error:'pro_plan_checkout_failed',
-      message:e?.message||null
-    });
-  }
-});
-app.post('/admin/create-missing-mp-plans',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const planos=[
-      {codigo:'BASICO',reason:'Estoque IA Básico',amount:49.90},
-      {codigo:'PREMIUM',reason:'Estoque IA Premium',amount:199.90}
-    ];
-
-    const resultados=[];
-
-    for(const p of planos){
-      const body={
-        reason:p.reason,
-        auto_recurring:{
-          frequency:1,
-          frequency_type:'months',
-          transaction_amount:p.amount,
-          currency_id:'BRL'
-        },
-        back_url:process.env.APP_URL||'https://estoque-ia-v12.onrender.com'
-      };
-
-      const r=await fetch(
-        'https://api.mercadopago.com/preapproval_plan',
-        {
-          method:'POST',
-          headers:{
-            Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`,
-            'Content-Type':'application/json'
-          },
-          body:JSON.stringify(body)
-        }
-      );
-
-      const data=await r.json();
-
-      resultados.push({
-        plano:p.codigo,
-        http_status:r.status,
-        id:data?.id||null,
-        status:data?.status||null,
-        init_point:data?.init_point||null,
-        error:data?.error||null,
-        message:data?.message||null
-      });
-    }
-
-    return res.json({results:resultados});
-
-  }catch(e){
-    return res.status(500).json({
-      error:'create_missing_mp_plans_failed',
-      message:e?.message||null
-    });
-  }
-});
-app.get('/admin/check-mp-pro-plan',auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const planId=process.env.MP_PLAN_PRO_ID;
-
-    if(!planId||!process.env.MP_ACCESS_TOKEN){
-      return res.status(503).json({
-        error:'mp_config_missing'
-      });
-    }
-
-    const r=await fetch(
-      `https://api.mercadopago.com/preapproval_plan/${planId}`,
-      {
-        headers:{
-          Authorization:`Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
-      }
-    );
-
-    const data=await r.json();
-
-    return res.status(r.status).json({
-      http_status:r.status,
-      plan_id:data?.id||null,
-      status:data?.status||null,
-      application_id:data?.application_id||null,
-      collector_id:data?.collector_id||null,
-      error:data?.error||null,
-      message:data?.message||null
-    });
-
-  }catch(e){
-    return res.status(500).json({
-      error:'mp_plan_check_failed'
-    });
-  }
-});
-app.post('/admin/sync-mp-subscription',
-  auth,role('ADMIN'),async(req,res)=>{
-  try{
-    const subscriptionId=
-      '9675140bd88f4f52a23bfd4acb94aca7';
-
-    if(!process.env.MP_ACCESS_TOKEN){
-      return res.status(503).json({
-        error:'mp_not_configured'
-      });
-    }
-
-    const r=await fetch(
-      'https://api.mercadopago.com/preapproval/'
-      +encodeURIComponent(subscriptionId),
-      {
-        headers:{
-          Authorization:
-            `Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
-      }
-    );
-
-    const data=await r.json();
-
-    if(!r.ok){
-      return res.status(502).json({
-        error:'mp_subscription_lookup_failed',
-        http_status:r.status
-      });
-    }
-
-    if(
-      data.id!==subscriptionId ||
-      data.status!=='authorized' ||
-      String(data.external_reference)!==
-        String(req.user.tenant_id) ||
-      data.preapproval_plan_id!==
-        process.env.MP_PLAN_PRO_ID
-    ){
-      return res.status(409).json({
-        error:'subscription_validation_failed',
-        status:data.status||null,
-        tenant_matches:
-          String(data.external_reference)===
-          String(req.user.tenant_id),
-        plan_matches:
-          data.preapproval_plan_id===
-          process.env.MP_PLAN_PRO_ID
-      });
-    }
-
-    await db.query(
-      `UPDATE tenants
-       SET plan='PRO',
-           status='ACTIVE',
-           billing_provider='MERCADO_PAGO',
-           provider_subscription_id=$1
-       WHERE id=$2`,
-      [subscriptionId,req.user.tenant_id]
-    );
-
-    return res.json({
-      ok:true,
-      plan:'PRO',
-      status:'ACTIVE',
-      subscription_id:subscriptionId
-    });
-
-  }catch(e){
-    console.error(
-      '[MP subscription sync]',
-      e?.message
-    );
-
-    return res.status(500).json({
-      error:'subscription_sync_failed'
-    });
-  }
-});
 app.listen(Number(process.env.PORT||3000),()=>console.log('Estoque IA V14 API on port '+(process.env.PORT||3000)));

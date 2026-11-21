@@ -26,9 +26,14 @@
       <h2 style="margin-bottom:6px">Plano <span id="subPlan">—</span></h2>
       <div id="subStatus" class="muted">Carregando assinatura...</div>
     </div>
-    <button id="subAction" style="width:auto" onclick="openSubscription()">Assinar / alterar plano</button>
+    <div class="row">
+      <button id="subAction" type="button" class="hidden" onclick="openSubscription()">Assinar</button>
+      <button id="subSync" type="button" class="secondary hidden" onclick="updateSubscription(false)">Atualizar status</button>
+      <button id="subCancel" type="button" class="secondary hidden" onclick="updateSubscription(true)">Cancelar assinatura</button>
+    </div>
   </div>
   <div id="subDetails" class="notice" style="margin-top:14px"></div>
+  <p id="subMessage" class="muted" role="status"></p>
 </div>
 <div id="subscriptionModal" class="card hidden">
   <div class="top"><div><span class="eyebrow">PLANOS ESTOQUE IA</span><h2>Escolha sua assinatura</h2></div><button class="secondary" style="width:auto" onclick="$('subscriptionModal').classList.add('hidden')">Fechar</button></div>
@@ -86,12 +91,14 @@ let token=localStorage.getItem('v12_token')||'',refreshToken=localStorage.getIte
   let bricksBuilder=null;
 let cardPaymentBrickController=null;
 let selectedBillingPlan=null;
+let isBillingAdmin=false;
 
 async function initMercadoPago(){
   try{
     const r=await fetch('/billing/config');
     const cfg=await r.json();
 
+    if(r.ok && !cfg.enabled) return;
     if(!r.ok||!cfg.public_key){
       throw new Error('Public Key não configurada');
     }
@@ -170,10 +177,10 @@ async function initMercadoPago(){
       })
     });
 
-    msg.textContent=result.status==='authorized'
-      ? 'Assinatura criada com sucesso.'
-      : 'Assinatura enviada. Status: '+(result.status||'processando');
-
+    $('subscriptionModal').classList.add('hidden');
+    $('subMessage').textContent=result.status==='ACTIVE'
+      ? 'Pagamento confirmado e assinatura ativa.'
+      : 'Assinatura enviada. Aguardando confirmação do pagamento.';
     await loadSubscription();
 
     return result;
@@ -202,11 +209,16 @@ async function initMercadoPago(){
     msg.textContent='Não foi possível carregar o formulário de pagamento.';
   }
   }
-  initMercadoPago();
+const billingReady = initMercadoPago();
 const br=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function readableError(j,status){
  if(typeof j?.error==='string'){
-   const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.'};
+   const map={registration_failed:'Este e-mail já pode estar cadastrado. Tente entrar ou use outro e-mail.',invalid_credentials:'E-mail ou senha inválidos.',unauthorized:'Sessão expirada. Entre novamente.',plan_limit_reached:'Limite do plano atingido.',
+      billing_not_configured:'A contratação está temporariamente indisponível.',
+      subscription_already_exists:'A empresa já tem uma assinatura ou uma contratação em andamento.',
+      subscription_confirmation_pending:'Aguardando confirmação do Mercado Pago. Consulte o status antes de tentar novamente.',
+      billing_provider_error:'O Mercado Pago não confirmou esta operação.',
+      insufficient_stock:'O saldo disponível é insuficiente para esta venda.'};
    return map[j.error]||j.error;
  }
  if(j?.error?.fieldErrors){const p=[];for(const [f,m] of Object.entries(j.error.fieldErrors)){if(m?.length)p.push((f==='password'?'senha':f)+': '+m.join(', '))}if(p.length)return p.join(' | ')}
@@ -244,14 +256,39 @@ function daysLeft(date){if(!date)return null;return Math.max(0,Math.ceil((new Da
 function statusPt(s){return ({TRIAL:'Teste grátis',ACTIVE:'Ativa',PENDING:'Pagamento pendente',PAST_DUE:'Pagamento pendente',CANCELLED:'Cancelada'}[s]||s||'—')}
 async function loadSubscription(){
  try{
-   const s=await call('/billing/subscription');
+   const [s] = await Promise.all([call('/billing/subscription'), billingReady]);
+   const linked = Boolean(s.provider_subscription_id && s.billing_provider === 'MERCADO_PAGO');
+   $('subAction').classList.toggle('hidden', !isBillingAdmin || !mp ||
+     s.checkout_in_progress || !s.can_checkout);
+   $('subSync').classList.toggle('hidden', !isBillingAdmin || !linked || s.checkout_in_progress);
+   $('subCancel').classList.toggle('hidden', !isBillingAdmin || !linked ||
+     s.status === 'CANCELLED' || s.checkout_in_progress);
    $('subPlan').textContent=s.plan||'—';
    $('subStatus').textContent='Status: '+statusPt(s.status);
    const d=daysLeft(s.trial_ends_at);
-   if(s.status==='TRIAL') $('subDetails').textContent=d===0?'Seu teste termina hoje. Assine para continuar usando o sistema.':`Teste grátis: ${d} dia(s) restante(s).`;
+   if(s.checkout_in_progress) $('subDetails').textContent='Contratação aguardando confirmação do Mercado Pago.';
+   else if(s.status==='TRIAL') $('subDetails').textContent=d===0?'Seu teste termina hoje. Assine para continuar usando o sistema.':`Teste grátis: ${d} dia(s) restante(s).`;
    else if(s.status==='ACTIVE') $('subDetails').textContent='Assinatura ativa'+(s.current_period_end?' · período atual até '+new Date(s.current_period_end).toLocaleDateString('pt-BR'):'')+'.';
-   else $('subDetails').textContent='Escolha um plano para manter o acesso aos recursos da assinatura.';
+   else if(s.status==='PENDING') $('subDetails').textContent='Aguardando confirmação do pagamento pelo Mercado Pago.';
+   else if(s.status==='PAST_DUE') $('subDetails').textContent='Pagamento pendente. Consulte o status da assinatura.';
+   else $('subDetails').textContent=mp ? 'Escolha um plano para contratar.' : 'A contratação está temporariamente indisponível.';
  }catch(e){$('subDetails').textContent='Não foi possível carregar a assinatura: '+e.message}
+}
+async function updateSubscription(cancel) {
+  if (cancel && !window.confirm('Cancelar a assinatura e encerrar o acesso aos recursos do plano?')) return;
+  const button = $(cancel ? 'subCancel' : 'subSync');
+  $('subSync').disabled = $('subCancel').disabled = true;
+  $('subMessage').textContent = 'Consultando o Mercado Pago…';
+  try {
+    const result = await call(cancel ? '/billing/cancel' : '/billing/sync', { method: 'POST' });
+    $('subMessage').textContent = 'Status da assinatura atualizado para ' + statusPt(result.status) + '.';
+    await loadSubscription();
+  } catch (error) {
+    $('subMessage').textContent = error.message;
+  } finally {
+    $('subSync').disabled = $('subCancel').disabled = false;
+    if (!button.classList.contains('hidden')) button.focus();
+  }
 }
 function openSubscription(){$('subscriptionModal').classList.remove('hidden');$('subscriptionModal').scrollIntoView({behavior:'smooth'})}
 async function checkoutPlan(plan){
@@ -263,7 +300,7 @@ async function checkoutPlan(plan){
   await renderPaymentBrick(plan);
   }
 
-async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');renderProducts();renderCart();loadSubscription();refreshInventory()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
+async function boot(){try{const [me,b,p,d,h]=await Promise.all([call('/me'),call('/branches'),call('/products'),call('/reports/dashboard'),call('/sales')]);$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=me.user.name+' · '+me.user.role+' · '+me.tenant.name;$('branch').innerHTML=b.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');products=p;$('rev').textContent=br(d.revenue);$('sales').textContent=d.sales;$('ticket').textContent=br(d.ticket);$('low').textContent=d.low_stock;$('history').innerHTML=h.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('pt-BR')}</td><td>${x.user_name}</td><td>${x.payment_method}</td><td>${br(x.total)}</td></tr>`).join('');isBillingAdmin=me.user.role==='ADMIN';renderProducts();renderCart();loadSubscription();refreshInventory()}catch(e){localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');token='';refreshToken='';$('auth').classList.remove('hidden');$('app').classList.add('hidden')}}
 const formatStockQuantity = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
 let inventoryPage = 1;
 let inventoryFilters = new URLSearchParams();
@@ -397,69 +434,4 @@ async function checkout(){if(!cart.length)return;try{const s=await call('/sales'
 async function addProduct(){try{await call('/products',{method:'POST',body:JSON.stringify({sku:$('sku').value,name:$('name').value,barcode:$('barcode').value,price:+$('price').value,cost:+$('cost').value,stock:+$('stock').value,min_stock:+$('min').value})});['sku','name','barcode','price','cost','stock','min'].forEach(id=>$(id).value='');await boot()}catch(e){alert('Produto não cadastrado: '+e.message)}}
 async function logout(){try{if(refreshToken)await fetch('/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})})}catch{}token='';refreshToken='';localStorage.removeItem('v12_token');localStorage.removeItem('v12_refresh');location.href='app.html?mode=login'}
 const qs=new URLSearchParams(location.search),mode=qs.get('mode'),plan=(qs.get('plan')||'PRO').toUpperCase();if(['BASICO','PRO','PREMIUM'].includes(plan))$('regPlan').value=plan;updatePlan();if(mode==='signup')showSignup();else showLogin();if(token)boot();
-async function criarUsuarioTesteMP(){
-  const btn=document.getElementById('mpTestBtn');
-  try{
-    btn.disabled=true;
-    btn.textContent='Criando...';
-
-    const x=await call('/admin/create-mp-test-user');
-
-    alert(
-      'USUÁRIO DE TESTE CRIADO\n\n' +
-      'Email: ' + (x.email||'não retornado') +
-      '\nID: ' + (x.id||'') +
-      '\nUsuário: ' + (x.nickname||'')
-    );
-  }catch(e){
-    alert('Erro ao criar usuário de teste: '+e.message);
-  }finally{
-    btn.disabled=false;
-    btn.textContent='Gerar comprador teste MP';
-  }
-}
-
-const mpTestBtn=document.createElement('button');
-mpTestBtn.id='mpTestBtn';
-mpTestBtn.textContent='Gerar comprador teste MP';
-mpTestBtn.onclick=criarUsuarioTesteMP;
-mpTestBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;padding:14px;background:#20c997;color:white;border:0;border-radius:10px;font-weight:bold';
-document.body.appendChild(mpTestBtn);
-
-
-
- async function verificarMercadoPago(){
-  try{
-    const x=await call('/admin/sync-mp-subscription',{
-      method:'POST'
-    });
-
-    alert(
-      'SINCRONIZAÇÃO MERCADO PAGO\n\n'+
-      'Resultado: '+(x.ok?'OK':'Erro')+
-      '\nPlano: '+(x.plan||'-')+
-      '\nStatus: '+(x.status||'-')+
-      '\nAssinatura: '+(x.subscription_id||'-')
-    );
-
-    if(x.ok){
-      await loadSubscription();
-    }
-
-  }catch(e){
-    alert('Erro na sincronização: '+e.message);
-  }
-} 
-  
-    
-
-  
-    
-  
-  
-
-const mpWhoBtn=document.createElement('button');
-mpWhoBtn.textContent='Verificar Mercado Pago';
-mpWhoBtn.onclick=verificarMercadoPago;
-mpWhoBtn.style.cssText='position:fixed;bottom:85px;right:20px;z-index:9999;padding:14px;background:#2563eb;color:white;border:0;border-radius:10px;font-weight:bold';
-document.body.appendChild(mpWhoBtn);</script></body></html>
+</script></body></html>
