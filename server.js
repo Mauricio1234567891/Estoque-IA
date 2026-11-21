@@ -42,7 +42,7 @@ app.post('/cash/:id/movement',auth,async(req,res)=>{const S=z.object({kind:z.enu
 app.post('/cash/:id/close',auth,async(req,res)=>{const x=(await db.query("UPDATE cash_sessions SET status='CLOSED',closing_amount=$1,closed_at=now() WHERE id=$2 AND tenant_id=$3 AND status='OPEN' RETURNING *",[req.body?.closing_amount||0,req.params.id,req.user.tenant_id])).rows[0];if(!x)return res.status(404).json({error:'cash_not_open'});res.json(x)});
 app.get('/receivables',auth,async(req,res)=>res.json((await db.query('SELECT r.*,c.name customer_name FROM receivables r LEFT JOIN customers c ON c.id=r.customer_id WHERE r.tenant_id=$1 ORDER BY r.created_at DESC',[req.user.tenant_id])).rows));
 app.post('/receivables/:id/pay',auth,async(req,res)=>{const amount=Number(req.body?.amount||0);if(amount<=0)return res.status(400).json({error:'invalid_amount'});const r=(await db.query(`UPDATE receivables SET paid_amount=LEAST(amount,paid_amount+$1),status=CASE WHEN paid_amount+$1>=amount THEN 'PAID' ELSE 'OPEN' END WHERE id=$2 AND tenant_id=$3 RETURNING *`,[amount,req.params.id,req.user.tenant_id])).rows[0];if(!r)return res.status(404).json({error:'not_found'});res.json(r)});
-app.post('/sales/:id/cancel',auth,role('ADMIN','GERENTE'),async(req,res)=>{const c=await db.connect();try{await c.query('BEGIN');const sale=(await c.query("SELECT * FROM sales WHERE id=$1 AND tenant_id=$2 AND status='COMPLETED' FOR UPDATE",[req.params.id,req.user.tenant_id])).rows[0];if(!sale)throw new Error('sale_not_found');const items=(await c.query('SELECT * FROM sale_items WHERE sale_id=$1',[sale.id])).rows;for(const i of items){await c.query('UPDATE products SET stock=stock+$1 WHERE id=$2 AND tenant_id=$3',[i.qty,i.product_id,req.user.tenant_id]);await c.query("INSERT INTO inventory_movements(tenant_id,branch_id,product_id,user_id,kind,qty,reference_id) VALUES($1,$2,$3,$4,'SALE_CANCEL',$5,$6)",[req.user.tenant_id,sale.branch_id,i.product_id,req.user.sub,i.qty,sale.id])}await c.query("UPDATE sales SET status='CANCELLED',cancelled_at=now() WHERE id=$1",[sale.id]);await c.query("UPDATE receivables SET status='CANCELLED' WHERE sale_id=$1 AND tenant_id=$2",[sale.id,req.user.tenant_id]);await c.query('COMMIT');await audit(req.user,'SALE_CANCELLED',{sale_id:sale.id});res.json({ok:true})}catch(e){await c.query('ROLLBACK');res.status(400).json({error:e.message})}finally{c.release()}});
+app.post('/sales/:id/cancel',auth,role('ADMIN','GERENTE'),async(req,res)=>{const c=await db.connect();try{await c.query('BEGIN');const sale=(await c.query("SELECT * FROM sales WHERE id=$1 AND tenant_id=$2 AND status='COMPLETED' FOR UPDATE",[req.params.id,req.user.tenant_id])).rows[0];if(!sale)throw new Error('sale_not_found');const items=(await c.query('SELECT * FROM sale_items WHERE sale_id=$1 ORDER BY product_id',[sale.id])).rows;for(const i of items){await c.query('UPDATE products SET stock=stock+$1 WHERE id=$2 AND tenant_id=$3',[i.qty,i.product_id,req.user.tenant_id]);await c.query("INSERT INTO inventory_movements(tenant_id,branch_id,product_id,user_id,kind,qty,reference_id) VALUES($1,$2,$3,$4,'SALE_CANCEL',$5,$6)",[req.user.tenant_id,sale.branch_id,i.product_id,req.user.sub,i.qty,sale.id])}await c.query("UPDATE sales SET status='CANCELLED',cancelled_at=now() WHERE id=$1",[sale.id]);await c.query("UPDATE receivables SET status='CANCELLED' WHERE sale_id=$1 AND tenant_id=$2",[sale.id,req.user.tenant_id]);await c.query('COMMIT');await audit(req.user,'SALE_CANCELLED',{sale_id:sale.id});res.json({ok:true})}catch(e){await c.query('ROLLBACK');res.status(400).json({error:e.message})}finally{c.release()}});
 
 const PUBLIC_PLANS={BASICO:{name:'Básico',amount:49.90,limits:PLAN_LIMITS.BASICO},PRO:{name:'PRO',amount:99.90,limits:PLAN_LIMITS.PRO},PREMIUM:{name:'Premium',amount:199.90,limits:PLAN_LIMITS.PREMIUM}};
 app.get('/billing/plans',(req,res)=>res.json(PUBLIC_PLANS));
@@ -197,7 +197,99 @@ app.get('/branches',auth,async(req,res)=>res.json((await db.query('SELECT id,nam
 app.get('/products',auth,async(req,res)=>res.json((await db.query('SELECT * FROM products WHERE tenant_id=$1 AND active=true ORDER BY name LIMIT 2000',[req.user.tenant_id])).rows));
 app.post('/products',auth,subscription,(req,res,next)=>enforceLimit('products',req,res,next),role('ADMIN','GERENTE'),async(req,res)=>{const S=z.object({sku:z.string().min(1),barcode:z.string().optional(),name:z.string().min(1),price:z.coerce.number().nonnegative(),cost:z.coerce.number().nonnegative().default(0),stock:z.coerce.number().default(0),min_stock:z.coerce.number().default(0)});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});const v=x.data;try{const p=(await db.query('INSERT INTO products(tenant_id,sku,barcode,name,price,cost,stock,min_stock) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[req.user.tenant_id,v.sku,v.barcode||null,v.name,v.price,v.cost,v.stock,v.min_stock])).rows[0];await audit(req.user,'PRODUCT_CREATED',{product_id:p.id,sku:p.sku});res.status(201).json(p)}catch{return res.status(409).json({error:'sku_already_exists'})}});
 app.patch('/products/:id',auth,role('ADMIN','GERENTE'),async(req,res)=>{const S=z.object({name:z.string().min(1).optional(),price:z.coerce.number().nonnegative().optional(),cost:z.coerce.number().nonnegative().optional(),min_stock:z.coerce.number().nonnegative().optional(),barcode:z.string().nullable().optional()});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});let p=(await db.query(`UPDATE products SET name=COALESCE($1,name),price=COALESCE($2,price),cost=COALESCE($3,cost),min_stock=COALESCE($4,min_stock),barcode=COALESCE($5,barcode) WHERE id=$6 AND tenant_id=$7 RETURNING *`,[x.data.name??null,x.data.price??null,x.data.cost??null,x.data.min_stock??null,x.data.barcode??null,req.params.id,req.user.tenant_id])).rows[0];if(!p)return res.status(404).json({error:'not_found'});await audit(req.user,'PRODUCT_UPDATED',{product_id:p.id});res.json(p)});
-app.post('/sales',auth,subscription,async(req,res)=>{const S=z.object({branch_id:z.string().uuid(),payment_method:z.string().min(1),items:z.array(z.object({product_id:z.string().uuid(),qty:z.coerce.number().positive()})).min(1)});const x=S.safeParse(req.body);if(!x.success)return res.status(400).json({error:x.error.flatten()});const c=await db.connect();try{await c.query('BEGIN');const branch=(await c.query('SELECT id FROM branches WHERE id=$1 AND tenant_id=$2',[x.data.branch_id,req.user.tenant_id])).rows[0];if(!branch)throw new Error('invalid_branch');let total=0,rows=[];for(const i of x.data.items){const p=(await c.query('SELECT * FROM products WHERE id=$1 AND tenant_id=$2 FOR UPDATE',[i.product_id,req.user.tenant_id])).rows[0];if(!p||Number(p.stock)<i.qty)throw new Error('insufficient_stock');total+=Number(p.price)*i.qty;rows.push([p,i.qty])}const sale=(await c.query('INSERT INTO sales(tenant_id,branch_id,user_id,total,payment_method) VALUES($1,$2,$3,$4,$5) RETURNING *',[req.user.tenant_id,x.data.branch_id,req.user.sub,total,x.data.payment_method])).rows[0];for(const [p,qty] of rows){await c.query('INSERT INTO sale_items(sale_id,product_id,qty,unit_price,unit_cost) VALUES($1,$2,$3,$4,$5)',[sale.id,p.id,qty,p.price,p.cost]);await c.query('UPDATE products SET stock=stock-$1 WHERE id=$2 AND tenant_id=$3',[qty,p.id,req.user.tenant_id]);await c.query("INSERT INTO inventory_movements(tenant_id,branch_id,product_id,user_id,kind,qty,reference_id) VALUES($1,$2,$3,$4,'SALE',$5,$6)",[req.user.tenant_id,x.data.branch_id,p.id,req.user.sub,-qty,sale.id])}await c.query('COMMIT');await audit(req.user,'SALE_COMPLETED',{sale_id:sale.id,total});res.status(201).json(sale)}catch(e){await c.query('ROLLBACK');res.status(400).json({error:e.message})}finally{c.release()}});
+const saleRequest = z.object({
+  branch_id: z.string().uuid(),
+  payment_method: z.string().min(1),
+  items: z.array(z.object({
+    product_id: z.string().uuid(),
+    qty: z.coerce.number().positive().max(99_999_999_999.999)
+      .refine(qty => qty === Math.round(qty * 1000) / 1000, {
+        message: 'Use até três casas decimais para a quantidade.'
+      })
+  })).min(1)
+});
+
+app.post('/sales', auth, subscription, async (req, res, next) => {
+  const request = saleRequest.safeParse(req.body);
+  if (!request.success) return res.status(400).json({ error: request.error.flatten() });
+
+  const { branch_id, payment_method, items } = request.data;
+  const { tenant_id, sub: userId } = req.user;
+  const productIds = [...new Set(items.map(item => item.product_id.toLowerCase()))];
+  let sale;
+  let total = 0;
+
+  try {
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      const branch = await client.query(
+        'SELECT id FROM branches WHERE id=$1 AND tenant_id=$2',
+        [branch_id, tenant_id]
+      );
+      if (!branch.rowCount) throw new Error('invalid_branch');
+
+      const products = await client.query(
+        'SELECT id, stock, price, cost FROM products WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE',
+        [tenant_id, productIds]
+      );
+      const byId = new Map(products.rows.map(product => [product.id, {
+        ...product,
+        // Use thousandths to match PostgreSQL numeric(14,3).
+        remaining: Math.round(Number(product.stock) * 1000)
+      }]));
+
+      const lines = [];
+      for (const item of items) {
+        const product = byId.get(item.product_id.toLowerCase());
+        const units = Math.round(item.qty * 1000);
+        if (!product || product.remaining < units) throw new Error('insufficient_stock');
+
+        product.remaining -= units;
+        total += Number(product.price) * item.qty;
+        lines.push({ product, qty: item.qty });
+      }
+
+      const created = await client.query(
+        'INSERT INTO sales(tenant_id,branch_id,user_id,total,payment_method) VALUES($1,$2,$3,$4,$5) RETURNING *',
+        [tenant_id, branch_id, userId, total, payment_method]
+      );
+      [sale] = created.rows;
+
+      for (const { product, qty } of lines) {
+        await client.query(
+          'INSERT INTO sale_items(sale_id,product_id,qty,unit_price,unit_cost) VALUES($1,$2,$3,$4,$5)',
+          [sale.id, product.id, qty, product.price, product.cost]
+        );
+        await client.query(
+          "INSERT INTO inventory_movements(tenant_id,branch_id,product_id,user_id,kind,qty,reference_id) VALUES($1,$2,$3,$4,'SALE',$5,$6)",
+          [tenant_id, branch_id, product.id, userId, -qty, sale.id]
+        );
+      }
+      for (const product of byId.values()) {
+        await client.query(
+          'UPDATE products SET stock=$1 WHERE id=$2 AND tenant_id=$3',
+          [product.remaining / 1000, product.id, tenant_id]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    if (['invalid_branch', 'insufficient_stock'].includes(error.message)) {
+      return res.status(400).json({ error: error.message });
+    }
+    return next(error);
+  }
+
+  await audit(req.user, 'SALE_COMPLETED', { sale_id: sale.id, total });
+  res.status(201).json(sale);
+});
 app.get('/sales',auth,async(req,res)=>{const q=await db.query(`SELECT s.id,s.total,s.payment_method,s.status,s.created_at,u.name user_name,b.name branch_name FROM sales s JOIN users u ON u.id=s.user_id JOIN branches b ON b.id=s.branch_id WHERE s.tenant_id=$1 ORDER BY s.created_at DESC LIMIT 200`,[req.user.tenant_id]);res.json(q.rows)});
 app.get('/reports/dashboard',auth,async(req,res)=>{const k=(await db.query("SELECT COALESCE(sum(total),0) revenue,count(*) sales,COALESCE(avg(total),0) ticket FROM sales WHERE tenant_id=$1 AND status='COMPLETED' AND created_at>=date_trunc('month',now())",[req.user.tenant_id])).rows[0];const low=(await db.query('SELECT count(*)::int low_stock FROM products WHERE tenant_id=$1 AND active=true AND stock<=min_stock',[req.user.tenant_id])).rows[0];res.json({...k,...low})});
 app.get('/audit',auth,role('ADMIN'),async(req,res)=>res.json((await db.query('SELECT action,metadata,created_at FROM audit_logs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.tenant_id])).rows));
