@@ -9,7 +9,19 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
-const {Pool}=pg; const db=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:undefined}); const app=express();
+const { Pool } = pg;
+const dbUrl = new URL(process.env.DATABASE_URL);
+dbUrl.searchParams.delete('sslmode');
+
+const db = new Pool({
+  connectionString: dbUrl.toString(),
+  ssl: {
+    ca: fs.readFileSync('/etc/secrets/prod-ca-2021.crt', 'utf8'),
+    rejectUnauthorized: true
+  }
+});
+
+const app = express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 async function migrate(){await db.query('CREATE TABLE IF NOT EXISTS schema_migrations(filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');for(const f of ['001_init.sql','002_v11.sql','003_v12.sql']){const done=(await db.query('SELECT 1 FROM schema_migrations WHERE filename=$1',[f])).rowCount;if(done)continue;const sql=fs.readFileSync(path.join(__dirname,f),'utf8');const c=await db.connect();try{await c.query('BEGIN');await c.query(sql);await c.query('INSERT INTO schema_migrations(filename) VALUES($1)',[f]);await c.query('COMMIT')}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}}
 await migrate();
